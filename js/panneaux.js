@@ -218,7 +218,7 @@ const Panneaux = (() => {
     for (const [k, v] of e.details || []) lignes.push([esc(k), esc(v)]);
 
     const fig = photo ? `<figure class="photo"><img src="${esc(photo.fichier)}" alt="${esc(photo.legende)}" loading="lazy">
-      <figcaption>Photo d’illustration, sans lien avec cet événement simulé : ${esc(photo.legende)}. ${esc(photo.auteur)}${photo.licence ? `, ${photo.lienLicence ? `<a href="${esc(photo.lienLicence)}" target="_blank" rel="noopener">${esc(photo.licence)}</a>` : esc(photo.licence)}` : ''}${photo.source ? `, <a href="${esc(photo.source)}" target="_blank" rel="noopener">source</a>` : ''}.</figcaption></figure>` : '';
+      <figcaption>Image d’illustration, sans lien avec cet événement simulé : ${esc(photo.legende)}. ${esc(photo.auteur)}${photo.licence ? `, ${photo.lienLicence ? `<a href="${esc(photo.lienLicence)}" target="_blank" rel="noopener">${esc(photo.licence)}</a>` : esc(photo.licence)}` : ''}${photo.source ? `, <a href="${esc(photo.source)}" target="_blank" rel="noopener">source</a>` : ''}.</figcaption></figure>` : '';
 
     return `<div class="detail-evt" style="--c:${coul}">${fig}
       <p class="meta-evt"><span class="an">${dateTexte(e.date)}</span> <span class="badge" style="background:${coul}">${NOM_CAT[e.cat] || e.cat}</span>
