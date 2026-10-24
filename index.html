@@ -15,14 +15,16 @@
   <div class="barre-in">
     <h1 class="marque">Atterrir</h1>
     <dl class="mesures">
-      <div><dt>Année</dt><dd id="m-annee">2025</dd></div>
+      <div class="date"><dt>Date</dt><dd id="m-date">janv. 2025</dd></div>
       <div><dt>Réchauffement</dt><dd id="m-temp">—</dd></div>
       <div class="opt"><dt>CO₂ dans l’air</dt><dd id="m-ppm">—</dd></div>
       <div class="opt"><dt>Population</dt><dd id="m-pop">—</dd></div>
+      <div class="opt"><dt>Inégalités</dt><dd id="m-gini">—</dd></div>
+      <div class="opt"><dt>Démocratie</dt><dd id="m-demo">—</dd></div>
       <div><dt>Capital<span class="long"> politique</span></dt><dd id="m-cap">—</dd></div>
     </dl>
     <button type="button" class="lien-aide">Règles</button>
-    <button type="button" class="avancer">Avancer</button>
+    <div class="horloge" data-horloge></div>
   </div>
 </header>
 
@@ -45,20 +47,24 @@
       <button type="button" role="tab" id="t-regions" data-o="regions" aria-controls="p-regions">Régions</button>
       <button type="button" role="tab" id="t-ressources" data-o="ressources" aria-controls="p-ressources">Ressources</button>
       <button type="button" role="tab" id="t-spheres" data-o="spheres" aria-controls="p-spheres">Sphères</button>
-      <button type="button" role="tab" id="t-journal" data-o="journal" aria-controls="p-journal">Journal</button>
+      <button type="button" role="tab" id="t-societe" data-o="societe" aria-controls="p-societe">Société</button>
+      <button type="button" role="tab" id="t-evenements" data-o="evenements" aria-controls="p-evenements">Événements</button>
     </div>
     <div id="p-politiques" role="tabpanel" aria-labelledby="t-politiques" tabindex="0"></div>
     <div id="p-regions" role="tabpanel" aria-labelledby="t-regions" tabindex="0" hidden></div>
     <div id="p-ressources" role="tabpanel" aria-labelledby="t-ressources" tabindex="0" hidden></div>
     <div id="p-spheres" role="tabpanel" aria-labelledby="t-spheres" tabindex="0" hidden></div>
-    <div id="p-journal" role="tabpanel" aria-labelledby="t-journal" tabindex="0" hidden></div>
+    <div id="p-societe" role="tabpanel" aria-labelledby="t-societe" tabindex="0" hidden></div>
+    <div id="p-evenements" role="tabpanel" aria-labelledby="t-evenements" tabindex="0" hidden></div>
   </section>
 </main>
 
 <div class="pied-mobile">
   <button type="button" class="lien-aide">Règles</button>
-  <button type="button" class="avancer">Avancer</button>
+  <div class="horloge" data-horloge></div>
 </div>
+
+<div class="toasts" id="toasts" role="log" aria-live="polite" aria-label="Événements mondiaux"></div>
 
 <dialog id="d-intro" aria-labelledby="intro-titre">
   <div class="dlg">
@@ -66,19 +72,12 @@
     <p class="accroche">2025. Sept des neuf limites planétaires sont déjà franchies, le climat s’est réchauffé d’environ 1,4 °C et l’économie mondiale double tous les 25 ans environ. Vous avez 75 ans pour faire entrer le monde dans le donut.</p>
     <ul class="regles">
       <li>Le donut est votre tableau de bord. L’anneau vert est l’espace sûr et juste : au-delà, les limites planétaires sont dépassées ; en dessous, des besoins humains ne sont pas couverts.</li>
-      <li>Chaque tour dure 5 ans. Répartissez votre capital politique entre neuf politiques, puis avancez. Une politique ne peut monter que d’un niveau par tour.</li>
-      <li>Tout est relié : une solution peut créer un problème ailleurs. Les points de bascule sont cachés et leurs seuils sont incertains.</li>
+      <li>Le temps s’écoule en continu : à vitesse normale, une minute vaut une année. Mettez en pause ou accélérez jusqu’à ×60 ; vous pouvez régler vos politiques à tout moment.</li>
+      <li>Répartissez votre capital politique entre neuf politiques. Chacune ne peut monter que d’un niveau tous les 5 ans, et le capital baisse en cas de guerre ou de crise.</li>
+      <li>Tout est relié : une solution peut créer un problème ailleurs. Guerres, famines, épidémies, révoltes et catastrophes climatiques apparaissent dans l’onglet Événements ; inégalités et démocratie, dans l’onglet Société. Les points de bascule sont cachés.</li>
     </ul>
     <p class="graine">Prototype : les chiffres de départ sont des ordres de grandeur arrondis et le modèle est volontairement simplifié.</p>
     <div class="actions" id="intro-actions"></div>
-  </div>
-</dialog>
-
-<dialog id="d-recap" aria-labelledby="recap-titre">
-  <div class="dlg">
-    <h2 id="recap-titre"></h2>
-    <div id="recap-corps"></div>
-    <div class="actions"><button type="button" class="avancer-principal" id="recap-ok">Continuer</button></div>
   </div>
 </dialog>
 
@@ -95,7 +94,9 @@
 </dialog>
 
 <script src="js/moteur.js"></script>
+<script src="js/societe.js"></script>
 <script src="js/carte.js"></script>
+<script src="js/panneaux.js"></script>
 <script src="js/interface.js"></script>
 </body>
 </html>

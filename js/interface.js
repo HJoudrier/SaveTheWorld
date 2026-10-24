@@ -3,10 +3,10 @@
 // =====================================================================
 (() => {
   'use strict';
-  const A = Atterrir, fr = A.fr, NB = '\u00a0';
+  const A = Atterrir, P = Panneaux, fr = A.fr, NB = '\u00a0';
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-  const CLE = 'atterrir.partie.v1';
+  const CLE = 'atterrir.partie.v2', CLE_OPT = 'atterrir.options';
   const NIVEAUX = ['aucun', 'modéré', 'fort', 'maximal'];
   const SPH = {
     atmo: ['Atmosphère', 'var(--atmo)'], hydro: ['Hydrosphère', 'var(--hydro)'], cryo: ['Cryosphère', 'var(--cryo)'],
@@ -29,13 +29,11 @@
     energie: 'Moins de 30 GJ d’énergie par habitant et par an (à efficacité égale à celle de 2025 : une maison mieux isolée chauffe autant avec moins).',
     stab: 'Stabilité sociale sous 45 sur 100.',
   };
-  const TYPES = {
-    debut: 'var(--encre-2)', evenement: 'var(--atmo)', bascule: 'var(--alerte)', crise: 'var(--manque)',
-    sortie: 'var(--donut)', ressource: 'var(--ocre)',
-  };
-
-  let st = null, onglet = 'politiques', regionSel = 'asi', metrique = 'co2hab';
-  let zoneFixe = null, nonLus = 0;
+  let etat = null, st = null, onglet = 'politiques', regionSel = 'asi', metrique = 'co2hab';
+  let zoneFixe = null, zoneVol = null, nonLus = 0;
+  let enMarche = false, vitesse = 1, filtreCat = 'tous', severe = false, pauseAuto = true;
+  const VITESSES = [1, 2, 5, 15, 60];
+  const SEC_PAR_AN = 60;                       // à la vitesse ×1 : une minute = une année
 
   // ---------- Utilitaires ----------
   const pct = (x, d = 0) => `${fr(x * 100, d)}${NB}%`;
@@ -43,41 +41,141 @@
   const signe = (x, d = 1) => `${x >= 0 ? '+' : '−'}${fr(Math.abs(x), d)}`;
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const popTot = () => st.regions.reduce((a, r) => a + r.pop, 0);
+  const moy = f => st.regions.reduce((a, r) => a + f(r) * r.pop, 0) / popTot();
   const doublement = g => (g > 0.0005 ? Math.round(Math.log(2) / Math.log(1 + g)) : null);
   const popTexte = m => (m >= 1000 ? `${fr(m / 1000, 2)}${NB}milliards` : `${fr(m, 0)}${NB}millions`);
   const def = id => A.BASCULES.find(b => b.id === id);
   const bascule = id => st.bascules.find(b => b.id === id);
 
-  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(st)); } catch (e) { /* stockage indisponible */ } }
+  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch (e) { /* stockage indisponible */ } }
   function charger() {
     try {
       const s = localStorage.getItem(CLE);
       if (!s) return null;
       const o = JSON.parse(s);
-      return o && o.version === 1 && o.regions ? o : null;
+      return o && o.version === 2 && o.regions && o.actifs ? o : null;
     } catch (e) { return null; }
   }
+  function chargerOptions() {
+    try { const o = JSON.parse(localStorage.getItem(CLE_OPT) || '{}'); if (typeof o.pauseAuto === 'boolean') pauseAuto = o.pauseAuto; if (VITESSES.includes(o.vitesse)) vitesse = o.vitesse; } catch (e) { /* ignoré */ }
+  }
+  function sauverOptions() { try { localStorage.setItem(CLE_OPT, JSON.stringify({ pauseAuto, vitesse })); } catch (e) { /* stockage indisponible */ } }
   function graineAdresse() { const m = location.hash.match(/^#s(\d{1,9})$/); return m ? +m[1] : null; }
   const nouvelleGraine = () => 1 + Math.floor(Math.random() * 999999);
 
   // ---------- Rendu général ----------
+  // `etat` est l'état du moteur ; `st` en est la vue à l'instant présent (grandeurs interpolées entre deux années).
+  function majVue() { st = A.vue(etat); }
+  const PANNEAUX = () => ({ politiques: rendrePolitiques, regions: rendreRegions, ressources: rendreRessources,
+    spheres: rendreSpheres, societe: rendreSociete, evenements: rendreEvenements });
+
   function rendre() {
+    majVue();
     rendreEntete(); rendreDonut(); rendreBocal();
-    rendrePolitiques(); rendreRegions(); rendreRessources(); rendreSpheres(); rendreJournal();
-    majOnglets();
+    PANNEAUX()[onglet]();
+    majOnglets(); majControles();
+  }
+  const focusDans = el => !!el && el.contains(document.activeElement) && document.activeElement !== el;
+  // Mise à jour périodique pendant que le temps s'écoule : on ne touche pas à ce que l'utilisateur est en train de parcourir
+  function rendreLeger(avecPanneau) {
+    majVue();
+    rendreEntete(); rendreBocal();
+    if (!focusDans($('#donut'))) rendreDonut();
+    const panneau = $(`#p-${onglet}`);
+    if (avecPanneau && !['politiques', 'evenements'].includes(onglet) && !focusDans(panneau)) PANNEAUX()[onglet]();
+  }
+  function rendrePanneauAvecFocus() {
+    const panneau = $(`#p-${onglet}`), a = document.activeElement;
+    let sel = null;
+    if (focusDans(panneau)) {
+      sel = a.tagName.toLowerCase() + [...a.attributes].filter(x => x.name.startsWith('data-') || x.name === 'id')
+        .map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+    }
+    PANNEAUX()[onglet]();
+    if (sel) panneau.querySelector(sel)?.focus({ preventScroll: true });
   }
 
+  let dateAff = '';
+  function majHorloge() {
+    const d = P.dateTexte(etat.t);
+    if (d !== dateAff) { dateAff = d; $('#m-date').textContent = d; }
+  }
   function rendreEntete() {
     const g = st.g, cout = A.coutTotal(st.leviers);
-    $('#m-annee').innerHTML = `${st.year} <small>${st.fini ? 'fin' : `tour ${st.tour + 1}/15`}</small>`;
+    dateAff = P.dateTexte(st.t); $('#m-date').textContent = dateAff;
     $('#m-temp').textContent = deg(g.T);
     $('#m-ppm').textContent = `${Math.round(g.ppm)}${NB}ppm`;
     $('#m-pop').textContent = popTexte(popTot());
-    $('#m-cap').innerHTML = `${cout} <small>sur ${st.budget}</small>`;
-    for (const b of $$('.avancer')) {
-      b.disabled = !st.fini && cout > st.budget;
-      b.textContent = st.fini ? 'Voir le bilan' : `Avancer jusqu’en ${st.year + 5}`;
+    $('#m-gini').textContent = fr(moy(r => r.gini), 2);
+    $('#m-demo').innerHTML = `${Math.round(moy(r => r.demo))} <small>/100</small>`;
+    const cap = $('#m-cap');
+    cap.innerHTML = `${cout} <small>sur ${st.budget}</small>`;
+    cap.classList.toggle('alerte', cout > st.budget);
+  }
+
+  // ---------- Écoulement du temps ----------
+  function construireHorloge() {
+    for (const c of $$('[data-horloge]')) {
+      c.innerHTML = `<button type="button" class="b-lecture"></button>
+        <span class="vitesses" role="group" aria-label="Vitesse : ×1 correspond à une année par minute">${VITESSES.map(v =>
+    `<button type="button" data-v="${v}" title="${v === 1 ? 'Une année par minute' : `${v} fois plus vite`}">×${v}</button>`).join('')}</span>
+        <label class="pause-auto"><input type="checkbox" class="c-pause"> Pause sur événement grave</label>`;
     }
+  }
+  function majControles() {
+    for (const b of $$('.b-lecture')) {
+      b.textContent = etat.fini ? 'Voir le bilan' : enMarche ? '⏸ Pause' : '▶ Lecture';
+      b.classList.toggle('pulse', !enMarche && !etat.fini && etat.t === A.ANNEE_DEBUT);
+    }
+    for (const b of $$('.vitesses button')) b.setAttribute('aria-pressed', +b.dataset.v === vitesse);
+    for (const c of $$('.c-pause')) c.checked = pauseAuto;
+  }
+  function lecture(marche) {
+    if (etat.fini) { ouvrirFin(); return; }
+    enMarche = marche;
+    majControles();
+  }
+
+  const BADGE_TOAST = 4;
+  function toast(e, pause) {
+    const c = $('#toasts'), d = document.createElement('div');
+    d.className = 'toast'; d.dataset.grav = e.gravite;
+    d.style.setProperty('--c', P.COUL_TYPE[e.type] || 'var(--trait)');
+    d.innerHTML = `<span class="toast-date">${P.dateTexte(e.date)}</span><strong>${esc(e.titre)}</strong>${pause ? '<span class="toast-pause">Pause automatique</span>' : ''}`;
+    d.addEventListener('click', () => { d.remove(); choisirOnglet('evenements'); });
+    c.appendChild(d);
+    while (c.children.length > BADGE_TOAST) c.firstChild.remove();
+    setTimeout(() => d.remove(), pause ? 20000 : 9000);
+  }
+  function traiterEvenements(liste) {
+    for (const e of liste) {
+      if (e.gravite >= 2 && onglet !== 'evenements') nonLus++;
+      const pause = pauseAuto && e.gravite >= 3 && enMarche;
+      if (e.gravite >= 2) toast(e, pause);
+      if (pause) { enMarche = false; majControles(); }
+    }
+    majOnglets();
+  }
+
+  let dernier = null, accLeger = 0, accPanneau = 0, accSauve = 0, anneeAff = null, sale = false;
+  const dialogueOuvert = () => !!document.querySelector('dialog[open]');
+  function boucle(ts) {
+    requestAnimationFrame(boucle);
+    const dt = dernier === null ? 0 : Math.min(0.5, (ts - dernier) / 1000);
+    dernier = ts;
+    if (!enMarche || etat.fini || dialogueOuvert()) return;
+    const res = A.avancerTemps(etat, dt * vitesse / SEC_PAR_AN);
+    majHorloge();
+    accLeger += dt; accPanneau += dt; accSauve += dt;
+    if (res.nouveaux.length) { traiterEvenements(res.nouveaux); sale = true; }
+    if (Math.floor(etat.t) !== anneeAff) { anneeAff = Math.floor(etat.t); sale = true; }
+    if (etat.fini) { enMarche = false; sauver(); rendre(); ouvrirFin(); return; }
+    if (accLeger >= 0.25 || (sale && accLeger >= 0.1)) {
+      accLeger = 0;
+      if (sale) { sale = false; accPanneau = 0; majVue(); rendreEntete(); rendreBocal(); if (!focusDans($('#donut'))) rendreDonut(); rendrePanneauAvecFocus(); }
+      else { rendreLeger(accPanneau >= 1); if (accPanneau >= 1) accPanneau = 0; }
+    }
+    if (accSauve >= 3) { accSauve = 0; sauver(); }
   }
 
   // ---------- Donut ----------
@@ -128,11 +226,11 @@
         <circle r="${R_IN}" fill="none" stroke="var(--donut)" stroke-width="1.5"/>
         <circle r="${R_OUT}" fill="none" stroke="var(--donut)" stroke-width="1.5"/>
         ${int}${lbl}
-        <text class="annee" y="2" text-anchor="middle">${st.year}</text>
+        <text class="annee" y="2" text-anchor="middle">${Math.floor(st.t)}</text>
         <text class="sous-annee" y="20" text-anchor="middle">${n} limites franchies</text>
         ${zones}
       </svg>`;
-    majDetail(zoneFixe);
+    majDetail(zoneVol || zoneFixe);
   }
 
   function majDetail(z) {
@@ -205,18 +303,19 @@
     let seg = '';
     for (let i = 0; i < Math.max(b, cout); i++) seg += `<i class="${i >= b ? 'trop' : i < cout ? 'plein' : ''}"></i>`;
     const aide = st.fini ? 'La partie est terminée.'
-      : dep ? `Il manque ${cout - b} point${cout - b > 1 ? 's' : ''} : baissez une politique pour pouvoir avancer.`
-        : 'Chaque politique peut monter d’un niveau par tour au maximum. Votre capital dépend de la stabilité des sociétés.';
+      : dep ? `Il manque ${cout - b} point${cout - b > 1 ? 's' : ''} : si cela dure, la politique la plus coûteuse sera abandonnée d’un niveau.`
+        : 'Chaque politique peut monter d’un niveau tous les 5 ans, et baisser à tout moment. Votre capital dépend de la stabilité, des guerres et des crises.';
     let rows = '';
     for (const l of A.LEVIERS) {
-      const n = st.leviers[l.id], p = st.leviersPrec[l.id];
+      const n = st.leviers[l.id];
       let btns = '';
       for (let k = 0; k <= 3; k++) {
-        const off = st.fini || k > p + 1;
+        const v = A.verifierReglage(etat, l.id, k), off = st.fini || !v.ok;
         btns += `<button type="button" data-l="${l.id}" data-n="${k}" aria-pressed="${k === n}" ${off ? 'disabled' : ''}
-          aria-label="${esc(l.nom)} : niveau ${k}, ${NIVEAUX[k]}${off && !st.fini ? ' (pas encore accessible)' : ''}">${k}</button>`;
+          aria-label="${esc(l.nom)} : niveau ${k}, ${NIVEAUX[k]}${off && !st.fini ? ` (${esc(v.raison)})` : ''}">${k}</button>`;
       }
       const [nomSph, coul] = SPH[l.sphere];
+      const attente = n < 3 && st.prochaine[l.id] > st.t ? `, prochaine hausse en ${Math.ceil(st.prochaine[l.id])}` : '';
       rows += `<li class="levier">
         <div>
           <h3><span class="pastille" style="--c:${coul}" title="${nomSph}"></span>${l.nom}</h3>
@@ -226,7 +325,7 @@
         </div>
         <div class="reglage">
           <div class="niveaux" role="group" aria-label="Niveau : ${esc(l.nom)}">${btns}</div>
-          <span class="cout">${NIVEAUX[n]}, coût ${A.COUTS[n]}${n !== p ? ` (avant : ${NIVEAUX[p]})` : ''}</span>
+          <span class="cout">${NIVEAUX[n]}, coût ${A.COUTS[n]}${attente}</span>
         </div>
       </li>`;
     }
@@ -250,10 +349,13 @@
       hist: { nom: 'Part du CO₂ depuis 1850', val: r => r.cumCO2 / cumTot, fmt: v => pct(v), max: 0.35, bas: '0 %', haut: '35 %' },
       stab: { nom: 'Stabilité sociale', val: r => r.S, fmt: v => `${Math.round(v)}/100`, max: 100, bien: true, bas: '0', haut: '100' },
       dmg: { nom: 'Dommages climatiques', val: r => r.dmg, fmt: v => `${fr(v * 100, 1)}${NB}% du PIB`, max: 0.08, bas: '0 %', haut: '8 %' },
+      gini: { nom: 'Inégalités', val: r => r.gini, fmt: v => `Gini ${fr(v, 2)}`, min: 0.25, max: 0.55, bas: '0,25', haut: '0,55' },
+      demo: { nom: 'Démocratie', val: r => r.demo, fmt: v => `${Math.round(v)}/100`, max: 100, bien: true, bas: '0', haut: '100' },
+      tension: { nom: 'Tensions', val: r => r.tension, fmt: v => `${Math.round(v)}/100`, max: 100, bas: '0', haut: '100' },
     };
   }
   function couleur(m, v) {
-    const p = Math.round(Math.max(0, Math.min(1, v / m.max)) * 100);
+    const p = Math.round(Math.max(0, Math.min(1, (v - (m.min || 0)) / (m.max - (m.min || 0)))) * 100);
     return m.bien ? `color-mix(in oklab, var(--donut) ${p}%, var(--alerte))` : `color-mix(in oklab, var(--alerte) ${p}%, var(--surface-2))`;
   }
 
@@ -270,7 +372,8 @@
       const [x, y] = proj(ETIQUETTES[r.id]);
       noms += `<text class="nom halo" x="${x}" y="${y}" text-anchor="middle">${r.court}</text>
         <text class="val halo" x="${x}" y="${+y + 15}" text-anchor="middle">${m.fmt(v)}</text>
-        ${r.crise ? `<text class="val halo" x="${x}" y="${+y + 29}" text-anchor="middle" style="fill:var(--alerte)">en crise</text>` : ''}`;
+        ${r.crise ? `<text class="val halo" x="${x}" y="${+y + 29}" text-anchor="middle" style="fill:var(--alerte)">en crise</text>` : ''}
+        ${st.actifs.guerres.some(w => w.region === r.id) ? `<text class="val halo" x="${x}" y="${+y + (r.crise ? 43 : 29)}" text-anchor="middle" style="fill:var(--alerte)">en guerre</text>` : ''}`;
     }
     const lacs = LACS.map(p => `<path class="lac" d="${chemin(p)}"/>`).join('');
     const a = m.bien ? 'var(--alerte)' : 'var(--surface-2)', b = m.bien ? 'var(--donut)' : 'var(--alerte)';
@@ -293,7 +396,7 @@
       : `Un habitant émet ${fr(co2h, 1)}${NB}t de CO₂ par an, soit ${fr(co2h / moy, 1)} fois la moyenne mondiale. La région a émis ${pct(r.cumCO2 / cumTot)} du CO₂ cumulé depuis 1850.`;
     const sc = r.S < 35 ? 'var(--alerte)' : r.S < 50 ? 'var(--ocre)' : 'var(--donut)';
     return `<div class="fiche">
-      <h3>${r.nom}${r.crise ? '<span class="badge">en crise</span>' : ''}</h3>
+      <h3>${r.nom}${r.crise ? '<span class="badge">en crise</span>' : ''}${st.actifs.guerres.some(w => w.region === r.id) ? '<span class="badge">en guerre</span>' : ''}</h3>
       <p class="phrase">${phrase}</p>
       <dl class="chiffres">
         <div><dt>Population</dt><dd>${popTexte(r.pop)}</dd></div>
@@ -304,6 +407,9 @@
         <div><dt>Émissions de CO₂</dt><dd>${fr(r.co2, 1)}${NB}Gt/an</dd></div>
         <div><dt>Stabilité sociale</dt><dd>${Math.round(r.S)}/100<div class="barre-mini" style="--c:${sc}"><i style="width:${r.S}%"></i></div></dd></div>
         <div><dt>Alimentation</dt><dd>${fr(r.food, 2)} <small>1 = besoins couverts</small></dd></div>
+        <div><dt>Inégalités (Gini)</dt><dd>${fr(r.gini, 2)}</dd></div>
+        <div><dt>Démocratie</dt><dd>${Math.round(r.demo)}/100<div class="barre-mini" style="--c:var(--hydro)"><i style="width:${r.demo}%"></i></div></dd></div>
+        <div><dt>Tensions</dt><dd>${Math.round(r.tension)}/100<div class="barre-mini" style="--c:var(--alerte)"><i style="width:${r.tension}%"></i></div></dd></div>
         <div><dt>Dommages climatiques</dt><dd>${fr(r.dmg * 100, 1)}${NB}% du PIB</dd></div>
       </dl></div>`;
   }
@@ -396,6 +502,8 @@
     const g = st.g, pib = st.hist[st.hist.length - 1].pib;
     const etatB = id => { const b = bascule(id); return b.active ? `basculé en ${b.annee}` : 'stable'; };
     const crises = st.regions.filter(r => r.crise).length;
+    const maxE = Math.max(50, ...st.hist.map(h => h.em + 2));
+    const minE = Math.min(0, ...st.hist.map(h => h.em));
     const blocs = [
       ['atmo', [['Réchauffement', deg(g.T)], ['CO₂', `${Math.round(g.ppm)}${NB}ppm`], ['Émissions', `${fr(g.emissions, 1)}${NB}Gt/an`], ['Autres gaz et aérosols', `${signe(g.nonCO2, 2)}${NB}°C`]]],
       ['hydro', [['Acidité (Ω aragonite)', fr(g.omega, 2)], ['Eau douce', `indice ${fr(g.eau, 2)}`], ['Courant atlantique', etatB('amoc')], ['Récifs coralliens', etatB('coraux')]]],
@@ -426,29 +534,18 @@
       <h3 class="titre-section">Points de bascule</h3>
       <p class="intro-panneau">Chaque barre montre la plage de réchauffement où le seuil se situe probablement (plus foncée au centre). Le trait vertical, c’est le réchauffement actuel. Le seuil exact de votre partie est caché.</p>
       <ul class="bascules">${lignes}
-        <li aria-hidden="true"><span></span><div class="graduation" style="position:relative;height:16px;display:block">${grad}</div></li></ul>`;
-  }
-
-  // ---------- Journal ----------
-  function entreeHTML(e) {
-    return `<li class="entree" style="--c:${TYPES[e.type] || 'var(--trait)'}">
-      <div class="tete"><span class="an">${e.annee}</span><h3>${esc(e.titre)}</h3></div>
-      <p class="texte">${esc(e.texte)}</p>
-      ${e.lecon ? `<p class="lecon">${esc(e.lecon)}</p>` : ''}
-      ${e.confiance ? `<p class="conf">${esc(e.confiance)}</p>` : ''}</li>`;
-  }
-  function rendreJournal() {
-    const maxE = Math.max(50, ...st.hist.map(h => h.em + 2));
-    const minE = Math.min(0, ...st.hist.map(h => h.em));
-    $('#p-journal').innerHTML = `
+        <li aria-hidden="true"><span></span><div class="graduation" style="position:relative;height:16px;display:block">${grad}</div></li></ul>
+      <h3 class="titre-section">Courbes du climat</h3>
       <div class="courbes">
         <figure><figcaption>Réchauffement et scénarios du GIEC</figcaption>${courbeTemperature()}</figure>
         <figure><figcaption>Émissions de CO₂ (Gt par an)</figcaption>${courbe({ series: [{ pts: serie('em'), coul: 'var(--encre)' }], ymin: Math.floor(minE / 10) * 10, ymax: maxE, yticks: [0, 20, 40, 60].filter(v => v <= maxE && v >= minE), label: 'Émissions de CO₂' })}</figure>
-        <figure><figcaption>Stabilité sociale moyenne</figcaption>${courbe({ series: [{ pts: serie('S'), coul: 'var(--manque)' }], ymin: 0, ymax: 100, yticks: [0, 50, 100], label: 'Stabilité sociale moyenne' })}</figure>
-      </div>
-      <h3 class="titre-section">Journal</h3>
-      <ul class="entrees">${[...st.journal].reverse().map(entreeHTML).join('')}</ul>`;
+      </div>`;
   }
+
+  // ---------- Société et événements ----------
+  const ctxPanneau = () => ({ st, A, fr, pct, esc, popTexte, courbe, signe });
+  function rendreSociete() { $('#p-societe').innerHTML = P.societe(ctxPanneau()); }
+  function rendreEvenements() { $('#p-evenements').innerHTML = P.evenements(ctxPanneau(), filtreCat, severe); }
 
   // ---------- Onglets ----------
   function majOnglets() {
@@ -458,42 +555,26 @@
       b.tabIndex = actif ? 0 : -1;
       $(`#p-${b.dataset.o}`).hidden = !actif;
     }
-    const t = $('#t-journal');
-    t.innerHTML = `Journal${nonLus ? `<span class="pastille-notif" aria-label="${nonLus} nouveaux">${nonLus}</span>` : ''}`;
+    const t = $('#t-evenements');
+    t.innerHTML = `Événements${nonLus ? `<span class="pastille-notif" aria-label="${nonLus} nouveaux">${nonLus}</span>` : ''}`;
   }
   function choisirOnglet(o) {
     onglet = o;
-    if (o === 'journal') nonLus = 0;
+    if (o === 'evenements') nonLus = 0;
+    majVue(); PANNEAUX()[o]();
     majOnglets();
   }
 
   // ---------- Dialogues ----------
   function ouvrirIntro() {
-    const enCours = st.tour > 0 && !st.fini;
+    enMarche = false; majControles();
+    const enCours = etat.t > A.ANNEE_DEBUT && !etat.fini;
     $('#intro-actions').innerHTML = enCours
-      ? `<button type="button" class="avancer-principal" data-act="continuer">Reprendre la partie (${st.year})</button>
+      ? `<button type="button" class="avancer-principal" data-act="continuer">Reprendre la partie (${P.dateTexte(etat.t)})</button>
          <button type="button" class="secondaire" data-act="nouvelle">Nouvelle partie</button>`
       : `<button type="button" class="avancer-principal" data-act="continuer">Commencer la partie</button>`;
     const d = $('#d-intro');
     if (!d.open) d.showModal();
-  }
-
-  function ouvrirRecap(nouveaux) {
-    const h = st.hist, a = h[h.length - 1], b = h[Math.max(0, h.length - 1 - A.PAS)];
-    const d = (k, v, mal, txt) => `<div><dt>${k}</dt><dd class="${mal === null ? '' : mal ? 'mal' : 'bien'}">${txt}</dd></div>`;
-    const dT = a.T - b.T, dE = a.em - b.em, dS = a.S - b.S, dP = a.pop - b.pop;
-    $('#recap-titre').textContent = `${b.a} → ${a.a}`;
-    $('#recap-corps').innerHTML = `
-      <dl class="deltas">
-        ${d('Réchauffement', dT, dT > 0.005, `${signe(dT, 2)}${NB}°C`)}
-        ${d('Émissions', dE, dE > 0, `${signe(dE, 1)}${NB}Gt/an`)}
-        ${d('Population', dP, null, `${signe(dP, 0)}${NB}M`)}
-        ${d('Stabilité', dS, dS < -0.5, `${signe(dS, 0)}`)}
-        ${d('Capital pour la suite', 0, null, `${st.budget}`)}
-      </dl>
-      <ul class="entrees">${nouveaux.length ? nouveaux.map(entreeHTML).join('') : '<li class="entree"><p class="texte">Cinq années sans événement majeur.</p></li>'}</ul>`;
-    $('#recap-ok').textContent = `Choisir mes politiques pour ${st.year}–${st.year + 5}`;
-    $('#d-recap').showModal();
   }
 
   const ISSUES = {
@@ -515,6 +596,11 @@
         <div><dt>Crises régionales</dt><dd>${b.crisesTotales}</dd></div>
         <div><dt>Sous le plancher social</dt><dd>${pct(b.sous)}</dd></div>
         <div><dt>Hausse des mers</dt><dd>+${fr(b.mer * 100, 0)}${NB}cm</dd></div>
+        <div><dt>Morts (guerres, famines, épidémies, catastrophes)</dt><dd>${P.morts(b.mortsTotal, fr)}</dd></div>
+        <div><dt>Guerres déclenchées</dt><dd>${b.stats.guerres}</dd></div>
+        <div><dt>Révolutions</dt><dd>${b.stats.revolutions}</dd></div>
+        <div><dt>Démocratie en 2100</dt><dd>${Math.round(b.demo)}/100</dd></div>
+        <div><dt>Inégalités en 2100</dt><dd>Gini ${fr(b.gini, 2)}</dd></div>
       </dl>
       <figure>${courbeTemperature(560, 220)}<figcaption>Votre réchauffement (trait plein) et les scénarios du GIEC (valeurs centrales approximatives, moyenne 2081-2100 placée en 2090).</figcaption></figure>
       <p class="graine">Partie n°${st.seed}. Pour rejouer exactement la même partie, ajoutez #s${st.seed} à la fin de l’adresse de la page.</p>`;
@@ -523,30 +609,35 @@
 
   // ---------- Actions ----------
   function nouvellePartie(graine) {
-    st = A.nouvellePartie(graine || graineAdresse() || nouvelleGraine());
-    zoneFixe = null; nonLus = 0; onglet = 'politiques';
+    etat = A.nouvellePartie(graine || graineAdresse() || nouvelleGraine());
+    zoneFixe = null; zoneVol = null; nonLus = 0; onglet = 'politiques'; enMarche = false; anneeAff = null; sale = false;
+    $('#toasts').innerHTML = '';
     sauver(); rendre();
-  }
-  function avancer() {
-    if (st.fini) { ouvrirFin(); return; }
-    const res = A.avancer(st);
-    if (res.erreur) return;
-    nonLus += res.nouveaux.length;
-    if (onglet === 'journal') nonLus = 0;
-    sauver(); rendre();
-    if (st.fini) ouvrirFin(); else ouvrirRecap(res.nouveaux);
   }
 
   function brancher() {
-    for (const b of $$('.avancer')) b.addEventListener('click', avancer);
     for (const b of $$('.lien-aide')) b.addEventListener('click', ouvrirIntro);
+    document.addEventListener('click', e => {
+      const l = e.target.closest('.b-lecture');
+      if (l) { lecture(!enMarche); return; }
+      const v = e.target.closest('.vitesses button');
+      if (v) { vitesse = +v.dataset.v; sauverOptions(); lecture(true); }
+    });
+    document.addEventListener('change', e => {
+      if (!e.target.matches('.c-pause')) return;
+      pauseAuto = e.target.checked; sauverOptions(); majControles();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.code !== 'Space' || e.target !== document.body || dialogueOuvert()) return;
+      e.preventDefault(); lecture(!enMarche);
+    });
+    window.addEventListener('pagehide', sauver);
     $('#intro-actions').addEventListener('click', e => {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (!act) return;
       if (act === 'nouvelle') nouvellePartie(nouvelleGraine());
       $('#d-intro').close(); sauver();
     });
-    $('#recap-ok').addEventListener('click', () => $('#d-recap').close());
     $('#fin-rejouer').addEventListener('click', () => { $('#d-fin').close(); history.replaceState(null, '', location.pathname + location.search); nouvellePartie(nouvelleGraine()); });
     $('#fin-meme').addEventListener('click', () => { $('#d-fin').close(); nouvellePartie(st.seed); });
     $('#fin-fermer').addEventListener('click', () => $('#d-fin').close());
@@ -554,8 +645,8 @@
     $('#p-politiques').addEventListener('click', e => {
       const b = e.target.closest('button[data-l]');
       if (!b || b.disabled) return;
-      st.leviers[b.dataset.l] = +b.dataset.n;
-      sauver();
+      A.regler(etat, b.dataset.l, +b.dataset.n);
+      sauver(); majVue();
       rendrePolitiques(); rendreEntete();
       $(`button[data-l="${b.dataset.l}"][data-n="${b.dataset.n}"]`)?.focus();
     });
@@ -573,10 +664,10 @@
     });
 
     const don = $('#donut');
-    don.addEventListener('pointerover', e => { const z = e.target.closest('.zone'); if (z) majDetail(z.dataset.z); });
-    don.addEventListener('pointerleave', () => majDetail(zoneFixe));
-    don.addEventListener('focusin', e => { const z = e.target.closest('.zone'); if (z) majDetail(z.dataset.z); });
-    don.addEventListener('focusout', () => majDetail(zoneFixe));
+    don.addEventListener('pointerover', e => { const z = e.target.closest('.zone'); if (z) { zoneVol = z.dataset.z; majDetail(zoneVol); } });
+    don.addEventListener('pointerleave', () => { zoneVol = null; majDetail(zoneFixe); });
+    don.addEventListener('focusin', e => { const z = e.target.closest('.zone'); if (z) { zoneVol = z.dataset.z; majDetail(zoneVol); } });
+    don.addEventListener('focusout', () => { zoneVol = null; majDetail(zoneFixe); });
     don.addEventListener('click', e => {
       const z = e.target.closest('.zone');
       zoneFixe = z ? (zoneFixe === z.dataset.z ? null : z.dataset.z) : null;
@@ -585,6 +676,17 @@
     don.addEventListener('keydown', e => {
       const z = e.target.closest('.zone');
       if (z && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); zoneFixe = z.dataset.z; majDetail(zoneFixe); }
+    });
+
+    const ev = $('#p-evenements');
+    ev.addEventListener('click', e => {
+      const c = e.target.closest('button[data-cat]');
+      if (!c) return;
+      filtreCat = c.dataset.cat; rendreEvenements(); ev.querySelector(`button[data-cat="${filtreCat}"]`)?.focus();
+    });
+    ev.addEventListener('change', e => {
+      if (e.target.id !== 'f-severe') return;
+      severe = e.target.checked; rendreEvenements(); $('#f-severe')?.focus();
     });
 
     const tabs = $('.onglets');
@@ -599,9 +701,11 @@
 
   function init() {
     const sauve = charger(), graine = graineAdresse();
-    if (sauve && !sauve.fini && (!graine || graine === sauve.seed)) st = sauve;
-    else st = A.nouvellePartie(graine || nouvelleGraine());
-    brancher(); rendre(); ouvrirIntro();
+    chargerOptions();
+    if (sauve && !sauve.fini && (!graine || graine === sauve.seed)) etat = sauve;
+    else etat = A.nouvellePartie(graine || nouvelleGraine());
+    construireHorloge(); brancher(); rendre(); ouvrirIntro();
+    requestAnimationFrame(boucle);
   }
   init();
 })();
