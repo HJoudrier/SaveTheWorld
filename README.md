@@ -10,8 +10,18 @@ points de bascule climatiques aux seuils cachés et incertains.
 
 ## Lancer le jeu
 
-Aucune installation : ouvrir `index.html` dans un navigateur (un seul fichier, HTML/CSS/JS).
+Aucune installation : ouvrir `index.html` dans un navigateur (HTML, CSS et JS simples, sans build).
 Seule la police Google Fonts est chargée en ligne ; sans réseau, des polices système la remplacent.
+
+## Structure
+
+- `index.html` : la page (structure et boîtes de dialogue)
+- `css/style.css` : styles, thèmes clair et sombre, mise en page mobile
+- `js/moteur.js` : moteur de simulation (modèle, leviers, événements), sans dépendance au DOM
+- `js/carte.js` : contours simplifiés des régions pour la carte
+- `js/interface.js` : interface (donut, onglets, dialogues, actions)
+
+Les scripts se chargent dans cet ordre.
 
 ## Statut
 
