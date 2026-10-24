@@ -33,6 +33,17 @@ Seule la police Google Fonts est chargée en ligne ; sans réseau, des polices s
   pollution, stabilité en indice 100) et population empilée par région.
 - **Politiques**, **Régions** (carte), **Ressources**, **Sphères** (système Terre et points de bascule).
 
+## Détails d'un événement
+
+Chaque événement du journal a un bouton **Détails** (les notifications et les cartes « En ce moment » aussi) :
+zones concernées sur une carte, population de ces zones, nombre de personnes touchées, morts, situation
+(en cours ou terminé), contexte climatique et démographique de l'époque. Pour les guerres, les famines et
+les épidémies, le bilan se met à jour tant que l'événement dure. Les nombres sont des estimations du jeu.
+
+Une photo d'illustration peut s'afficher en haut de la fiche, avec sa légende, son auteur et sa licence.
+Les photos se déclarent dans `js/photos.js` (le format y est expliqué) et se placent dans `img/evenements/` ;
+sans photo pour un type d'événement, la fiche s'affiche sans illustration.
+
 ## Structure
 
 - `index.html` : la page (structure et boîtes de dialogue)
@@ -41,7 +52,8 @@ Seule la police Google Fonts est chargée en ligne ; sans réseau, des polices s
 - `js/societe.js` : module société (inégalités, démocratie, tensions, guerres, famines, épidémies, révoltes)
 - `js/migrations.js` : module migrations (déplacés climatiques, de guerre et de faim ; flux entre régions ; accueil et fermeture des frontières)
 - `js/carte.js` : contours simplifiés des régions pour la carte
-- `js/panneaux.js` : panneaux Société, Population et Événements (HTML généré à partir de l'état)
+- `js/photos.js` : banque de photos d'illustration des événements (`img/evenements/`)
+- `js/panneaux.js` : panneaux Société, Population et Événements, et fiche de détail d'un événement (HTML généré à partir de l'état)
 - `js/interface.js` : interface (donut, onglets, horloge, dialogues, actions)
 
 Les scripts se chargent dans cet ordre. Le moteur et le module société fonctionnent aussi sous Node :

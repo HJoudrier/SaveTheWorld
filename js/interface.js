@@ -144,10 +144,17 @@
     d.className = 'toast'; d.dataset.grav = e.gravite;
     d.style.setProperty('--c', P.COUL_TYPE[e.type] || 'var(--trait)');
     d.innerHTML = `<span class="toast-date">${P.dateTexte(e.date)}</span><strong>${esc(e.titre)}</strong>${pause ? '<span class="toast-pause">Pause automatique</span>' : ''}`;
-    d.addEventListener('click', () => { d.remove(); choisirOnglet('evenements'); });
+    d.addEventListener('click', () => { d.remove(); ouvrirEvenement(e.id); });
     c.appendChild(d);
     while (c.children.length > BADGE_TOAST) c.firstChild.remove();
     setTimeout(() => d.remove(), pause ? 20000 : 9000);
+  }
+  function ouvrirEvenement(id) {
+    majVue();
+    $('#event-corps').innerHTML = P.detail(ctxPanneau(), id);
+    const d = $('#d-event');
+    if (!d.open) d.showModal();
+    d.scrollTop = 0;
   }
   function traiterEvenements(liste) {
     for (const e of liste) {
@@ -685,6 +692,11 @@
       if (z && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); zoneFixe = z.dataset.z; majDetail(zoneFixe); }
     });
 
+    document.addEventListener('click', e => {
+      const b = e.target.closest('button[data-evt]');
+      if (b) ouvrirEvenement(+b.dataset.evt);
+    });
+    $('#event-fermer').addEventListener('click', () => $('#d-event').close());
     const ev = $('#p-evenements');
     ev.addEventListener('click', e => {
       const c = e.target.closest('button[data-cat]');

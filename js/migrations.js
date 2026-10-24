@@ -28,6 +28,13 @@
     return `${fr(Math.round(m), 0)} millions`;
   }
 
+  // « Afrique 1,2 M, Asie 0,6 M » : les principaux flux sortants (depuis) ou entrants (vers) d'une région
+  function principaux(st, o, id, sens) {
+    const l = Object.entries(st.migr.flux).map(([k, v]) => { const [a, b] = k.split('>'); return { id: sens === 'depuis' ? b : a, ou: sens === 'depuis' ? a : b, v }; })
+      .filter(f => f.ou === id && f.v >= 0.01).sort((x, y) => y.v - x.v).slice(0, 3);
+    return l.length ? l.map(f => `${st.regions.find(r => r.id === f.id).court} ${o.fr(f.v, f.v < 1 ? 2 : 1)} M`).join(', ') : null;
+  }
+
   function init(st) {
     st.migr = { stock: { clim: 10, conflit: 120, autre: 5 }, cum: { clim: 0, conflit: 0, autre: 0 }, flux: {}, seuil: 0, alertes: {} };
     for (const r of st.regions) {
@@ -81,20 +88,25 @@
         o.journaliser(st, 'migration', `Exode : ${r.court}`,
           `Environ ${texteMillions(r.dep, o.fr)} de personnes quittent leur foyer en un an, chassées par le climat, la guerre ou la faim. La plupart restent dans leur pays ou dans la région.`,
           'Les déplacements forcés sont d’abord internes : les pays pauvres accueillent la majorité des déplacés.', 'Confiance élevée (HCR, Banque mondiale)', r.id,
-          { gravite: r.dep > 20 ? 3 : 2 });
+          { gravite: r.dep > 20 ? 3 : 2, photo: 'migration', touches: r.dep, labelTouches: 'Personnes déplacées sur l’année (estimation)',
+            details: [['Part restée dans la région', `${Math.round(PART_INTERNE * 100)} %`], ['Principales destinations hors région', principaux(st, o, r.id, 'depuis') || 'aucune route ouverte']] });
       }
       if (part > 0.0035 && st.year - al.afflux > 3) {
         al.afflux = st.year;
         if (r.demo !== undefined) r.demo = o.clamp(r.demo - 1.5, 3, 97);
         o.journaliser(st, 'migration', `Afflux de réfugiés : ${r.court}`,
           `Environ ${texteMillions(r.arr, o.fr)} de personnes arrivent en un an. L’accueil devient un enjeu politique majeur et les tensions montent.`,
-          'Un afflux rapide, même modeste en proportion, nourrit les mouvements de rejet quand les services publics sont déjà sous tension.', 'Observé', r.id, { gravite: 2 });
+          'Un afflux rapide, même modeste en proportion, nourrit les mouvements de rejet quand les services publics sont déjà sous tension.', 'Observé', r.id,
+          { gravite: 2, photo: 'migration', touches: r.arr, labelTouches: 'Personnes accueillies sur l’année (estimation)',
+            details: [['Principales régions d’origine', principaux(st, o, r.id, 'vers') || 'diverses']] });
       }
       if (r.ouv < 0.3 && !al.ferme) {
         al.ferme = true;
         o.journaliser(st, 'migration', `Frontières fermées : ${r.court}`,
           'Face à l’afflux et aux tensions, la région durcit ses frontières. Une grande partie des candidats à l’exil reste bloquée dans des camps, sans perspective.',
-          'Fermer les frontières réduit les arrivées, mais pas les causes des départs.', 'Tendance observée', r.id, { gravite: 2 });
+          'Fermer les frontières réduit les arrivées, mais pas les causes des départs.', 'Tendance observée', r.id,
+          { gravite: 2, photo: 'migration', touches: r.arr * (1 - r.ouv) / Math.max(0.05, r.ouv), labelTouches: 'Candidats à l’exil bloqués sur l’année (estimation)',
+            details: [['Part des demandes acceptées', `${Math.round(r.ouv * 100)} %`]] });
       } else if (r.ouv > 0.5 && al.ferme) al.ferme = false;
     }
 
@@ -105,7 +117,7 @@
         `Depuis 2025, au moins ${texteMillions(s, o.fr)} de personnes ont dû quitter leur foyer à cause de la chaleur, des sécheresses, des tempêtes et de la montée des eaux.`,
         'Les migrations climatiques sont surtout internes. Elles dépendent autant de la pauvreté et de l’adaptation que du réchauffement lui-même.',
         'Estimations très incertaines : la Banque mondiale (2021) projette jusqu’à 216 millions de migrants climatiques internes d’ici 2050.', null,
-        { gravite: s >= 500 ? 3 : 2 });
+        { gravite: s >= 500 ? 3 : 2, photo: 'migration', touches: s, labelTouches: 'Personnes déplacées depuis 2025 (estimation)' });
     }
   }
 

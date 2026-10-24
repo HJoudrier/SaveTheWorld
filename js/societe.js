@@ -58,7 +58,14 @@
     },
   };
 
+  // Part de la population d'une région vivant dans la zone des combats, selon l'intensité de la guerre
+  const PART_ZONE = [0, 0.02, 0.06, 0.25];
+  const LBL_GUERRE = 'Population de la zone de combats (estimation)';
+  const LBL_FAIM = 'Personnes en insécurité alimentaire grave (estimation)';
+  const LBL_INFECTES = 'Personnes infectées (estimation)';
   const reg = (st, id) => st.regions.find(r => r.id === id);
+  // Met à jour le bilan d'un événement qui dure (guerre, famine, épidémie) : l'entrée du journal reste à jour
+  const majEvt = (st, o, id, champs) => { const ev = id && o.trouverEvenement(st, id); if (ev) Object.assign(ev, champs); };
   const penuries = g => g.penuriePetrole + g.penurieMetaux;
   const moyenne = (st, f) => st.regions.reduce((a, r) => a + f(r) * r.pop, 0) / st.regions.reduce((a, r) => a + r.pop, 0);
   const guerreDe = (st, id) => st.actifs.guerres.find(w => w.region === id);
@@ -96,12 +103,14 @@
       r.demoOff = r.demo - cibleDemo(r, st);
       r.tensOff = r.tension - cibleTension(r, st);
     }
-    for (const w of GUERRES_INITIALES) {
+    GUERRES_INITIALES.forEach((w, i) => {
       st.stats.guerres++;
-      o.journaliser(st, 'guerre', w.titre, w.texte,
+      const e = o.journaliser(st, 'guerre', w.titre, w.texte,
         `Intensité ${INTENSITES[w.intensite]}. Les guerres réduisent le capital politique : les gouvernements en guerre ont moins de ressources pour agir sur le climat.`,
-        'Situation en 2025, résumée', w.region, { gravite: 2 });
-    }
+        'Situation en 2025, résumée', w.region,
+        { gravite: 2, photo: 'guerre', enCours: true, touches: reg(st, w.region).pop * PART_ZONE[w.intensite], labelTouches: LBL_GUERRE });
+      st.actifs.guerres[i].evtId = e.id;
+    });
   }
 
   // --- Guerres -------------------------------------------------------------------
@@ -115,12 +124,14 @@
     }[c]));
     const u = o.alea(st), p3 = 0.07 + Math.max(0, r.tension - 70) / 200;
     const intensite = u < p3 ? 3 : u < p3 + 0.38 ? 2 : 1;
-    st.actifs.guerres.push({ region: r.id, debut: st.year, intensite, cause, morts: 0, base: 0 });
+    const rec = { region: r.id, debut: st.year, intensite, cause, morts: 0, base: 0 };
+    st.actifs.guerres.push(rec);
     st.stats.guerres++;
     r.S -= 4; r.tension += 6;
     const c = CAUSES[cause];
-    o.journaliser(st, 'guerre', c.titre(r), `${c.texte} Intensité ${INTENSITES[intensite]}.`, c.lecon, c.conf, r.id,
-      { gravite: intensite >= 2 ? 3 : 2 });
+    const e = o.journaliser(st, 'guerre', c.titre(r), `${c.texte} Intensité ${INTENSITES[intensite]}.`, c.lecon, c.conf, r.id,
+      { gravite: intensite >= 2 ? 3 : 2, photo: 'guerre', enCours: true, touches: r.pop * PART_ZONE[intensite], labelTouches: LBL_GUERRE });
+    rec.evtId = e.id;
   }
 
   function guerres(st, o) {
@@ -129,6 +140,7 @@
       const r = reg(st, w.region);
       const m = o.tuer(st, r, r.pop * MORT_GUERRE[w.intensite] * (0.6 + 0.8 * o.alea(st)), 'guerre');
       w.morts += m;
+      majEvt(st, o, w.evtId, { morts: w.morts, touches: r.pop * PART_ZONE[w.intensite] });
       const sup = Math.max(0, w.intensite - w.base);       // les guerres déjà en cours en 2025 sont comprises dans la stabilité de départ
       r.S -= 0.7 * sup; r.dmgEvt += 0.004 * sup;
       if (w.intensite < 3 && r.tension > 65 && o.alea(st) < 0.06) {
@@ -136,14 +148,17 @@
         o.journaliser(st, 'guerre', `La guerre s’aggrave : ${r.court}`,
           `Le conflit s’étend et s’intensifie : l’intensité est désormais ${INTENSITES[w.intensite]}.`,
           'Plus un conflit dure, plus il détruit les institutions qui pourraient y mettre fin.', null, r.id,
-          { gravite: w.intensite === 3 ? 3 : 2 });
+          { gravite: w.intensite === 3 ? 3 : 2, photo: 'guerre', touches: r.pop * PART_ZONE[w.intensite], labelTouches: LBL_GUERRE, morts: w.morts });
       } else if (o.alea(st) < 0.12 * (w.intensite === 3 ? 0.7 : 1)) {
         liste.splice(liste.indexOf(w), 1);
         r.tension = Math.max(0, r.tension - 8);
+        const duree = Math.max(1, st.year - w.debut);
+        majEvt(st, o, w.evtId, { enCours: false, fin: st.year });
         o.journaliser(st, 'paix', `Fin des combats : ${r.court}`,
-          `Après ${Math.max(1, st.year - w.debut)} ans de guerre, un cessez-le-feu est signé. La reconstruction commence.`,
+          `Après ${duree} ans de guerre, un cessez-le-feu est signé. La reconstruction commence.`,
           'La plupart des guerres civiles se terminent par un accord négocié plutôt que par une victoire totale.', null, r.id,
-          { gravite: 2, cat: 'guerre', morts: w.morts });
+          { gravite: 2, cat: 'guerre', morts: w.morts, photo: 'paix', touches: r.pop * PART_ZONE[w.intensite], labelTouches: LBL_GUERRE,
+            details: [['Durée du conflit', `${duree} an${duree > 1 ? 's' : ''}`]] });
       }
     }
     for (const r of st.regions) {
@@ -162,11 +177,16 @@
         // le moteur retire déjà ces décès de la population : ici, on les compte seulement
         const m = r.pop * 0.5 * 0.03 * deficit;
         st.morts.famine += m; f.morts += m;
+        const touches = r.pop * o.clamp((0.95 - r.food) * 1.2, 0.02, 0.4);
+        majEvt(st, o, f.evtId, { morts: f.morts, touches });
         if (r.food > 0.93) {
           liste.splice(liste.indexOf(f), 1);
+          const duree = Math.max(1, st.year - f.debut);
+          majEvt(st, o, f.evtId, { enCours: false, fin: st.year });
           o.journaliser(st, 'famine', `Fin de la famine : ${r.court}`,
-            `Après ${Math.max(1, st.year - f.debut)} ans, les récoltes et les importations rétablissent l’approvisionnement.`,
-            null, null, r.id, { gravite: 1, cat: 'famine', morts: f.morts });
+            `Après ${duree} ans, les récoltes et les importations rétablissent l’approvisionnement.`,
+            null, null, r.id, { gravite: 1, cat: 'famine', morts: f.morts, photo: 'famine',
+              details: [['Durée de la famine', `${duree} an${duree > 1 ? 's' : ''}`]] });
         }
       } else if (r.food < 0.90 && o.alea(st) < 0.6) {
         const cause = guerreDe(st, r.id) ? 'guerre' : penuries(g) > 0.05 ? 'energie' : g.T > 1.8 ? 'climat' : 'prix';
@@ -176,12 +196,15 @@
           climat: 'Sécheresses et canicules répétées ruinent les récoltes, et les stocks sont épuisés.',
           prix: 'Les prix des céréales s’envolent et une partie de la population ne peut plus se nourrir.',
         }[cause];
-        liste.push({ region: r.id, debut: st.year, morts: 0 });
+        const rec = { region: r.id, debut: st.year, morts: 0 };
+        liste.push(rec);
         st.stats.famines++;
         r.tension += 5;
-        o.journaliser(st, 'famine', `Famine : ${r.court}`, txt,
+        const e = o.journaliser(st, 'famine', `Famine : ${r.court}`, txt,
           'Les famines modernes sont rarement dues à un manque absolu de nourriture : elles résultent de pauvreté, de guerres et de prix.',
-          'Confiance élevée (FAO)', r.id, { gravite: deficit > 0.15 || r.pop > 1000 ? 3 : 2 });
+          'Confiance élevée (FAO)', r.id, { gravite: deficit > 0.15 || r.pop > 1000 ? 3 : 2, photo: 'famine', enCours: true, labelTouches: LBL_FAIM,
+            touches: r.pop * o.clamp((0.95 - r.food) * 1.2, 0.02, 0.4) });
+        rec.evtId = e.id;
       }
     }
   }
@@ -213,12 +236,15 @@
         e.morts += m; r.S -= 0.6 * e.gravite;
       }
       if (e.portee === 'monde') g.chocPIB += 0.004 * e.gravite;
+      majEvt(st, o, e.evtId, { morts: e.morts, touches: e.morts / e.ifr });
       if (st.year >= e.fin) {
         liste.splice(liste.indexOf(e), 1);
+        majEvt(st, o, e.evtId, { enCours: false, fin: st.year });
         o.journaliser(st, 'epidemie', `Fin de l’épidémie : ${e.nom}`,
           e.portee === 'monde' ? 'La circulation du virus ralentit grâce à l’immunité acquise, aux traitements et aux restrictions.'
             : 'Les derniers foyers sont maîtrisés.', null, null, e.portee === 'monde' ? null : e.portee,
-          { gravite: 1, cat: 'epidemie', morts: e.morts });
+          { gravite: 1, cat: 'epidemie', morts: e.morts, photo: 'epidemie', touches: e.morts / e.ifr, labelTouches: LBL_INFECTES,
+            regions: e.portee === 'monde' ? null : [e.portee] });
       }
     }
     const pop = st.regions.reduce((a, r) => a + r.pop, 0);
@@ -229,15 +255,19 @@
         const u = o.alea(st);
         if (u < 0.75) {
           const gravite = 2;
-          liste.push({ nom: 'pandémie', portee: 'monde', gravite, debut: st.year, fin: st.year + 2, duree: 2, mort: 0.0009, morts: 0 });
+          const rec = { nom: 'pandémie', portee: 'monde', gravite, debut: st.year, fin: st.year + 2, duree: 2, mort: 0.0009, ifr: 0.005, morts: 0 };
+          liste.push(rec);
           st.stats.epidemies++;
-          o.journaliser(st, 'epidemie', 'Pandémie', 'Un nouveau virus se propage sur tous les continents en quelques mois : frontières fermées, hôpitaux saturés.',
-            'La destruction des habitats multiplie les contacts entre faune sauvage, élevage et humains.', 'Confiance moyenne (IPBES)', null, { gravite: 3 });
+          rec.evtId = o.journaliser(st, 'epidemie', 'Pandémie', 'Un nouveau virus se propage sur tous les continents en quelques mois : frontières fermées, hôpitaux saturés.',
+            'La destruction des habitats multiplie les contacts entre faune sauvage, élevage et humains.', 'Confiance moyenne (IPBES)', null,
+            { gravite: 3, photo: 'epidemie', enCours: true, labelTouches: LBL_INFECTES, touches: 0 }).id;
         } else {
-          liste.push({ nom: 'pandémie meurtrière', portee: 'monde', gravite: 3, debut: st.year, fin: st.year + 3, duree: 3, mort: 0.008, morts: 0 });
+          const rec = { nom: 'pandémie meurtrière', portee: 'monde', gravite: 3, debut: st.year, fin: st.year + 3, duree: 3, mort: 0.008, ifr: 0.02, morts: 0 };
+          liste.push(rec);
           st.stats.epidemies++;
-          o.journaliser(st, 'epidemie', 'Pandémie meurtrière', 'Un virus très contagieux et très létal se répand dans le monde. Les systèmes de santé sont dépassés et l’économie se fige.',
-            'La grippe de 1918 a tué environ 2 à 3 % de la population mondiale.', 'Précédent historique', null, { gravite: 3 });
+          rec.evtId = o.journaliser(st, 'epidemie', 'Pandémie meurtrière', 'Un virus très contagieux et très létal se répand dans le monde. Les systèmes de santé sont dépassés et l’économie se fige.',
+            'La grippe de 1918 a tué environ 2 à 3 % de la population mondiale.', 'Précédent historique', null,
+            { gravite: 3, photo: 'epidemie', enCours: true, labelTouches: LBL_INFECTES, touches: 0 }).id;
         }
       }
     }
@@ -247,11 +277,13 @@
       const lam = 0.008 + 0.04 * Math.max(0, 55 - r.S) / 55 + 0.008 * Math.max(0, g.T - 1.2);
       if (o.alea(st) < lam) {
         const mal = o.choisirParmi(st, MALADIES, m => poidsMaladie(m, r, g.T) + 1e-9);
-        liste.push({ nom: mal.nom, portee: r.id, gravite: 1, debut: st.year, fin: st.year + 1, duree: 1, mort: 5e-5, morts: 0 });
+        const rec = { nom: mal.nom, portee: r.id, gravite: 1, debut: st.year, fin: st.year + 1, duree: 1, mort: 5e-5, ifr: 0.01, morts: 0 };
+        liste.push(rec);
         st.stats.epidemies++;
-        o.journaliser(st, 'epidemie', `Épidémie de ${mal.nom} : ${r.court}`, mal.texte,
+        rec.evtId = o.journaliser(st, 'epidemie', `Épidémie de ${mal.nom} : ${r.court}`, mal.texte,
           mal.chaud > 1 ? 'Le réchauffement étend l’aire des moustiques et de plusieurs maladies à transmission vectorielle.' : null,
-          mal.chaud > 1 ? 'Confiance élevée (GIEC)' : null, r.id, { gravite: 1 });
+          mal.chaud > 1 ? 'Confiance élevée (GIEC)' : null, r.id,
+          { gravite: 1, photo: 'epidemie', enCours: true, labelTouches: LBL_INFECTES, touches: 0 }).id;
       }
     }
   }
@@ -274,7 +306,7 @@
     st.stats.revoltes++;
     return o.journaliser(st, 'revolte', `${c[0]} : ${r.court}`,
       `${c[1]} ${concede ? 'Le gouvernement fait des concessions.' : 'Le pouvoir réprime la contestation.'}`, c[2], null, r.id,
-      { gravite: 2, morts });
+      { gravite: 2, morts, photo: 'revolte', touches: r.pop * 0.01, labelTouches: 'Participants (estimation)' });
   }
 
   function revolution(st, o, r, precedent) {
@@ -306,14 +338,18 @@
     r.S = Math.max(r.S, issue === 'aut' ? 40 : 45);
     r.crise = false; r.derniereRev = st.year;
     st.stats.revolutions++;
-    const e = o.journaliser(st, 'revolution', titre, texte, lecon, conf, r.id, { gravite: 3, cat: 'revolte', morts });
+    const e = o.journaliser(st, 'revolution', titre, texte, lecon, conf, r.id,
+      { gravite: 3, cat: 'revolte', morts, photo: 'revolution', touches: r.pop * 0.02, labelTouches: 'Participants (estimation)' });
     if (precedent) e.date = Math.max(e.date, Math.min(st.year - 0.001, precedent.date + 0.05));
     // une révolution dégénère parfois en guerre civile
     if (!guerreDe(st, r.id) && o.alea(st) < 0.25) {
-      st.actifs.guerres.push({ region: r.id, debut: st.year, intensite: 2, cause: 'civile', morts: 0, base: 0 });
+      const rec = { region: r.id, debut: st.year, intensite: 2, cause: 'civile', morts: 0, base: 0 };
+      st.actifs.guerres.push(rec);
       st.stats.guerres++;
       const c = CAUSES.civile;
-      const g = o.journaliser(st, 'guerre', c.titre(r), `${c.texte} La transition n’a pas tenu. Intensité ${INTENSITES[2]}.`, c.lecon, c.conf, r.id, { gravite: 3 });
+      const g = o.journaliser(st, 'guerre', c.titre(r), `${c.texte} La transition n’a pas tenu. Intensité ${INTENSITES[2]}.`, c.lecon, c.conf, r.id,
+        { gravite: 3, photo: 'guerre', enCours: true, touches: r.pop * PART_ZONE[2], labelTouches: LBL_GUERRE });
+      rec.evtId = g.id;
       g.date = Math.max(g.date, Math.min(st.year - 0.001, e.date + 0.05));
     }
   }

@@ -36,6 +36,11 @@ const Atterrir = (() => {
       gP0: 0.011, gPf: 0.001, kP: 0.03, gY0: 0.015, gYf: 0.010, vuln: 1.0, cote: 1.0 },
   ];
   const PARAM = Object.fromEntries(REGIONS.map(r => [r.id, r]));
+  // Zones concernées par chaque point de bascule (null : le monde entier)
+  const BASCULE_ZONES = {
+    coraux: ['nam', 'sam', 'afr', 'asi', 'oce'], pergelisol: ['nam', 'eur', 'asi'], groenland: null, antarctique: null,
+    amazonie: ['sam'], amoc: ['nam', 'eur', 'afr'], boreale: ['nam', 'eur', 'asi'],
+  };
 
   // --- Leviers politiques ------------------------------------------------
   const LEVIERS = [
@@ -148,6 +153,7 @@ const Atterrir = (() => {
   function coutTotal(lev) { return Object.values(lev).reduce((a, n) => a + COUTS[n], 0); }
   const bascule = (st, id) => st.bascules.find(b => b.id === id).active;
   const popTotale = st => st.regions.reduce((a, r) => a + r.pop, 0);
+  const popDe = (st, ids) => st.regions.filter(r => ids.includes(r.id)).reduce((a, r) => a + r.pop, 0);
   function stabiliteMoyenne(st) {
     return st.regions.reduce((a, r) => a + r.S * r.pop, 0) / popTotale(st);
   }
@@ -285,7 +291,7 @@ const Atterrir = (() => {
       st.flags.pic = st.year;
       journaliser(st, 'ressource', 'Pic pétrolier',
         'La production mondiale de pétrole ne suit plus la demande. Une partie du manque est comblée par du charbon liquéfié, encore plus émetteur.',
-        'Une ressource finie ne s’arrête pas net : elle devient de plus en plus coûteuse à extraire, en argent et en énergie.', 'Mécanisme bien établi, date débattue');
+        'Une ressource finie ne s’arrête pas net : elle devient de plus en plus coûteuse à extraire, en argent et en énergie.', 'Mécanisme bien établi, date débattue', null, { photo: 'ressource-petrole' });
     }
 
     // Métaux : croissance économique + construction des infrastructures bas-carbone
@@ -299,7 +305,7 @@ const Atterrir = (() => {
       st.flags.metaux = st.year;
       journaliser(st, 'ressource', 'Pénurie de métaux',
         'Cuivre, nickel, lithium : les mines ne suivent plus. Les chantiers d’éoliennes et de réseaux électriques ralentissent.',
-        'La transition énergétique est aussi une transition matérielle : les limites se déplacent d’une sphère à l’autre.', 'Mécanisme établi, ampleur débattue');
+        'La transition énergétique est aussi une transition matérielle : les limites se déplacent d’une sphère à l’autre.', 'Mécanisme établi, ampleur débattue', null, { photo: 'ressource-metaux' });
     }
 
     // Pêches : croissance logistique, effondrement sous 20 % de la capacité
@@ -317,7 +323,7 @@ const Atterrir = (() => {
       st.flags.peche = st.year;
       journaliser(st, 'ressource', 'Effondrement des pêcheries',
         'Les grands stocks de poissons s’effondrent les uns après les autres. Les flottes restent à quai.',
-        'Comme la morue de Terre-Neuve en 1992 : un stock surexploité peut s’effondrer brutalement et mettre des décennies à revenir.', 'Fait observé');
+        'Comme la morue de Terre-Neuve en 1992 : un stock surexploité peut s’effondrer brutalement et mettre des décennies à revenir.', 'Fait observé', null, { photo: 'ressource-peche' });
       for (const r of st.regions) r.S -= 3;
     }
 
@@ -380,11 +386,13 @@ const Atterrir = (() => {
         r.crise = true; r.nbCrises++;
         journaliser(st, 'crise', `${r.court} entre en crise`,
           'Pénuries, chômage, défiance : les institutions ne parviennent plus à répondre. L’économie recule de 3 % par an et vos politiques y sont deux fois moins efficaces.',
-          'Un effondrement réduit les émissions… au prix de souffrances immenses. Ce n’est pas une stratégie.', null, r.id);
+          'Un effondrement réduit les émissions… au prix de souffrances immenses. Ce n’est pas une stratégie.', null, r.id,
+          { touches: r.pop, labelTouches: 'Population de la région', photo: 'crise' });
       } else if (r.crise && r.S > 38) {
         r.crise = false;
         journaliser(st, 'sortie', `${r.court} sort de la crise`,
-          'La société se réorganise et retrouve un peu de stabilité.', null, null, r.id);
+          'La société se réorganise et retrouve un peu de stabilité.', null, null, r.id,
+          { touches: r.pop, labelTouches: 'Population de la région', photo: 'crise' });
       }
     }
   }
@@ -403,7 +411,7 @@ const Atterrir = (() => {
         if (b.id === 'amoc') { for (const r of st.regions) if (r.id === 'eur' || r.id === 'afr') r.S -= 8; }
         journaliser(st, 'bascule', `Point de bascule franchi : ${def.nom}`, def.effet,
           'Une fois franchi, un point de bascule s’entretient tout seul : réduire les émissions ne suffit plus à revenir en arrière.',
-          'Seuils incertains (Armstrong McKay et al., 2022)');
+          'Seuils incertains (Armstrong McKay et al., 2022)', null, { regions: BASCULE_ZONES[b.id], photo: `bascule-${b.id}` });
       }
     }
   }
@@ -446,14 +454,14 @@ const Atterrir = (() => {
         r.S -= 7; st.g.chocAlim += 0.02;
         const morts = tuer(st, r, r.pop * 0.00004 * PARAM[r.id].vuln * st.g.T, 'climat');
         return [`Canicule historique : ${r.court}`, 'Récoltes perdues, hôpitaux saturés, centrales électriques à l’arrêt faute d’eau de refroidissement.',
-          'Chaque dixième de degré supplémentaire rend les vagues de chaleur extrêmes plus fréquentes et plus intenses.', 'Confiance très élevée (GIEC)', r.id, morts];
+          'Chaque dixième de degré supplémentaire rend les vagues de chaleur extrêmes plus fréquentes et plus intenses.', 'Confiance très élevée (GIEC)', r.id, morts, { touches: r.pop * 0.04 * PARAM[r.id].vuln }];
       } },
     { id: 'secheresse', cat: 'climat', gravite: 2, poids: st => Math.max(0, (st.g.T - 1.1) * 1.6),
       jouer(st) {
         st.g.chocAlim += 0.06;
         for (const r of st.regions) if (r.id === 'afr' || r.id === 'asi') r.S -= 3;
         return ['Sécheresses simultanées', 'Plusieurs greniers à blé du monde manquent d’eau la même année. Les prix alimentaires flambent.',
-          'Quand plusieurs grandes régions agricoles sont touchées en même temps, les stocks mondiaux ne suffisent plus à amortir le choc.', 'Confiance moyenne (GIEC)', null, null];
+          'Quand plusieurs grandes régions agricoles sont touchées en même temps, les stocks mondiaux ne suffisent plus à amortir le choc.', 'Confiance moyenne (GIEC)', null, null, { regions: ['afr', 'asi'], touches: popDe(st, ['afr', 'asi']) * 0.03 }];
       } },
     { id: 'inondation', cat: 'climat', gravite: 2, poids: st => Math.max(0, (st.g.T - 1) * 1.5),
       jouer(st) {
@@ -461,7 +469,7 @@ const Atterrir = (() => {
         r.S -= 5; r.dmgEvt += 0.02;
         const morts = tuer(st, r, r.pop * 0.00001 * PARAM[r.id].cote * PARAM[r.id].vuln, 'climat');
         return [`Inondations : ${r.court}`, 'Des pluies diluviennes et une mer plus haute submergent villes côtières et vallées.',
-          'Un air plus chaud contient plus de vapeur d’eau, environ 7 % de plus par degré : les pluies extrêmes s’intensifient.', 'Confiance élevée (GIEC)', r.id, morts];
+          'Un air plus chaud contient plus de vapeur d’eau, environ 7 % de plus par degré : les pluies extrêmes s’intensifient.', 'Confiance élevée (GIEC)', r.id, morts, { touches: r.pop * 0.003 * PARAM[r.id].cote * PARAM[r.id].vuln }];
       } },
     { id: 'cyclone', cat: 'climat', gravite: 2, poids: st => 0.2 + Math.max(0, (st.g.T - 1) * 1.2),
       jouer(st) {
@@ -469,13 +477,13 @@ const Atterrir = (() => {
         r.S -= 4; r.dmgEvt += 0.015;
         const morts = tuer(st, r, r.pop * 0.000012 * PARAM[r.id].cote * PARAM[r.id].vuln * st.g.T, 'climat');
         return [`Cyclone dévastateur : ${r.court}`, 'Des vents de plus de 250 km/h et une onde de tempête rasent des villes côtières. Des millions de personnes sont déplacées.',
-          'Les cyclones les plus puissants gagnent en fréquence avec le réchauffement, même si leur nombre total ne change guère.', 'Confiance moyenne (GIEC)', r.id, morts];
+          'Les cyclones les plus puissants gagnent en fréquence avec le réchauffement, même si leur nombre total ne change guère.', 'Confiance moyenne (GIEC)', r.id, morts, { touches: r.pop * 0.004 * PARAM[r.id].cote * PARAM[r.id].vuln }];
       } },
     { id: 'feux', cat: 'climat', gravite: 2, poids: st => Math.max(0, (st.g.T - 1) * 1.2),
       jouer(st) {
         st.g.foret -= 0.4; st.g.bii -= 0.3; st.g.co2Evt += 1.5;
         return ['Mégafeux', 'Des millions d’hectares de forêt brûlent en zone boréale et méditerranéenne.',
-          'Les forêts qui brûlent relâchent leur carbone : une rétroaction qui amplifie le réchauffement.', 'Confiance élevée (GIEC)', null, null];
+          'Les forêts qui brûlent relâchent leur carbone : une rétroaction qui amplifie le réchauffement.', 'Confiance élevée (GIEC)', null, null, { regions: ['nam', 'eur'], touches: popDe(st, ['nam', 'eur']) * 0.004 }];
       } },
     { id: 'techno', cat: 'eco', gravite: 1, poids: () => 1.0,
       jouer(st) {
@@ -494,7 +502,7 @@ const Atterrir = (() => {
         st.g.chocPIB += 0.012;
         for (const r of st.regions) r.S -= 5;
         return ['Krach financier mondial', 'Les marchés s’effondrent, le crédit se tarit, le chômage monte partout.',
-          'Dans une économie mondialisée, un choc financier se propage en quelques semaines à tous les continents.', 'Fait observé (2008)', null, null];
+          'Dans une économie mondialisée, un choc financier se propage en quelques semaines à tous les continents.', 'Fait observé (2008)', null, null, { touches: popTotale(st) * 0.01, labelTouches: 'Emplois perdus (estimation)' }];
       } },
     { id: 'cop', cat: 'politique', gravite: 2, poids: st => 0.4 + stabiliteMoyenne(st) / 100,
       jouer(st) {
@@ -506,40 +514,45 @@ const Atterrir = (() => {
       jouer(st) {
         for (const r of st.regions) r.S -= (r.yEff > SEUIL_RICHE ? 4 : 2);
         return ['Déplacements de population', 'Des millions de personnes quittent des régions devenues trop chaudes, trop sèches ou submergées.',
-          'La plupart des déplacés climatiques restent dans leur pays ou leur région : les pays pauvres en accueillent le plus.', 'Confiance élevée (GIEC)', null, null];
+          'La plupart des déplacés climatiques restent dans leur pays ou leur région : les pays pauvres en accueillent le plus.', 'Confiance élevée (GIEC)', null, null, { touches: popTotale(st) * 0.003, labelTouches: 'Personnes déplacées (estimation)' }];
       } },
     { id: 'entraide', cat: 'politique', gravite: 1, poids: st => 0.4 + 0.3 * st.leviers.protection + 0.2 * st.leviers.solidarite,
       jouer(st) {
         const r = st.regions.reduce((a, x) => (x.S < a.S ? x : a));
         r.S += 6;
         return [`Réseaux d’entraide : ${r.court}`, 'Coopératives, circuits courts et associations de quartier se multiplient.',
-          'La résilience d’une société dépend aussi de sa cohésion et de sa capacité à s’organiser localement.', 'Observé', r.id, null];
+          'La résilience d’une société dépend aussi de sa cohésion et de sa capacité à s’organiser localement.', 'Observé', r.id, null, { touches: r.pop * 0.002, labelTouches: 'Personnes impliquées (estimation)' }];
       } },
   ];
 
   // Épisodes climatiques fréquents et de moindre portée : ils alimentent le journal sans bouleverser le modèle
   const MINEURS = [
     { poids: st => 1 + 2 * Math.max(0, st.g.T - 1), reg: r => PARAM[r.id].vuln * Math.sqrt(r.pop),
+      cle: 'chaleur', touches: r => r.pop * 0.002 * PARAM[r.id].vuln,
       titre: r => `Vague de chaleur : ${r.court}`,
       textes: ['Plusieurs jours consécutifs à plus de 40 °C : hôpitaux et réseaux électriques sous tension.',
         'Des records de température tombent. Les personnes âgées et les travailleurs en plein air sont les plus touchés.'],
       morts: (r, T) => r.pop * 0.000004 * PARAM[r.id].vuln * T },
     { poids: st => 0.8 + 1.5 * Math.max(0, st.g.T - 1), reg: r => PARAM[r.id].cote * Math.sqrt(r.pop),
+      cle: 'tempete', touches: r => r.pop * 0.0008 * PARAM[r.id].cote,
       titre: r => `Tempête violente : ${r.court}`,
       textes: ['Vents destructeurs et submersion de la côte : routes coupées, des milliers de sinistrés.',
         'Une tempête exceptionnelle arrache des toitures et prive des centaines de milliers de foyers d’électricité.'],
       morts: (r, T) => r.pop * 0.000002 * PARAM[r.id].cote * PARAM[r.id].vuln * T },
     { poids: st => 0.8 + 1.5 * Math.max(0, st.g.T - 1), reg: r => Math.sqrt(r.pop),
+      cle: 'pluies', touches: r => r.pop * 0.0006,
       titre: r => `Pluies diluviennes : ${r.court}`,
       textes: ['Un mois de pluie en deux jours : rivières en crue, récoltes noyées, quartiers évacués.',
         'Des crues soudaines emportent des routes et des ponts.'],
       morts: (r) => r.pop * 0.000001 },
     { poids: st => 0.4 + 1.2 * Math.max(0, st.g.T - 1), reg: r => PARAM[r.id].vuln * Math.sqrt(r.pop),
+      cle: 'secheresse', touches: r => r.pop * 0.004,
       titre: r => `Sécheresse prolongée : ${r.court}`,
       textes: ['Rivières à sec, réservoirs au plus bas, restrictions d’eau et récoltes en baisse.',
         'Plusieurs saisons sans pluie suffisante : le bétail meurt et les prix des céréales montent.'],
       morts: null },
     { poids: st => 0.4 + 1.2 * Math.max(0, st.g.T - 1), reg: r => Math.sqrt(r.pop),
+      cle: 'feux', touches: r => r.pop * 0.0002,
       titre: r => `Incendies de forêt : ${r.court}`,
       textes: ['Des milliers d’hectares partent en fumée ; des villages sont évacués.',
         'Un été sec favorise des incendies hors de contrôle, avec des fumées visibles à des centaines de kilomètres.'],
@@ -550,8 +563,8 @@ const Atterrir = (() => {
     for (const e of EVENEMENTS) {
       const n = poisson(st, K_EVT * e.poids(st));
       for (let i = 0; i < n; i++) {
-        const [titre, texte, lecon, conf, region, morts] = e.jouer(st);
-        journaliser(st, e.cat, titre, texte, lecon, conf, region, { gravite: e.gravite, morts });
+        const [titre, texte, lecon, conf, region, morts, details] = e.jouer(st);
+        journaliser(st, e.cat, titre, texte, lecon, conf, region, { gravite: e.gravite, morts, photo: e.id, ...details });
       }
     }
     const n = poisson(st, 0.25 + 1.2 * Math.max(0, st.g.T - 1));
@@ -560,7 +573,7 @@ const Atterrir = (() => {
       const r = choisirRegion(st, m.reg);
       r.S -= 0.25;
       const morts = m.morts ? tuer(st, r, m.morts(r, st.g.T), 'climat') : 0;
-      journaliser(st, 'climat', m.titre(r), variante(st, m.textes), null, null, r.id, { gravite: 1, morts });
+      journaliser(st, 'climat', m.titre(r), variante(st, m.textes), null, null, r.id, { gravite: 1, morts, photo: m.cle, touches: m.touches(r) });
     }
     for (const r of st.regions) r.S = clamp(r.S, 0, 100);
   }
@@ -570,13 +583,21 @@ const Atterrir = (() => {
   const GRAVITE_DE_TYPE = { debut: 1, ressource: 2, crise: 3, sortie: 2, bascule: 3 };
   function journaliser(st, type, titre, texte, lecon, confiance, region = null, extra = {}) {
     const date = st.calcul ? st.year - 1 + alea(st) : st.t;
+    st.nextId = (st.nextId || 0) + 1;
     const e = {
-      annee: Math.floor(date), date, type, cat: extra.cat || CAT_DE_TYPE[type] || type,
+      id: st.nextId, annee: Math.floor(date), date, type, cat: extra.cat || CAT_DE_TYPE[type] || type,
       gravite: extra.gravite || GRAVITE_DE_TYPE[type] || 2, titre, texte, lecon, confiance, region,
+      regions: extra.regions !== undefined ? extra.regions : (region ? [region] : null),   // null : le monde entier
+      touches: extra.touches === undefined ? null : extra.touches, labelTouches: extra.labelTouches || null,
+      photo: extra.photo || type, details: extra.details || null, enCours: extra.enCours === undefined ? null : extra.enCours,
       morts: extra.morts || null,
     };
     st.pendants.push(e);
     return e;
+  }
+  // Retrouve un événement du journal (révélé ou non) pour mettre à jour son bilan tant qu'il dure
+  function trouverEvenement(st, id) {
+    return st.journal.find(e => e.id === id) || st.pendants.find(e => e.id === id) || null;
   }
   function liberer(st, sortie) {
     if (!st.pendants.length) return;
@@ -610,7 +631,7 @@ const Atterrir = (() => {
     st.leviers[l.id]--;
     journaliser(st, 'politique', `Politique abandonnée : ${l.nom}`,
       `Faute de capital politique, le niveau de cette politique est ramené à « ${['aucun', 'modéré', 'fort', 'maximal'][st.leviers[l.id]]} ». Vous pourrez le relever quand le capital sera revenu.`,
-      'Guerres, crises et défiance réduisent la capacité des gouvernements à agir dans la durée.', null, null, { gravite: 2 });
+      'Guerres, crises et défiance réduisent la capacité des gouvernements à agir dans la durée.', null, null, { gravite: 2, photo: 'politique' });
   }
   function verifierReglage(st, id, n) {
     if (st.fini) return { ok: false, raison: 'La partie est terminée.' };
@@ -744,7 +765,7 @@ const Atterrir = (() => {
   // Outils mis à disposition des modules (js/societe.js…)
   const OUTILS = {
     ANNEE_DEBUT, ANNEE_FIN, SEUIL_RICHE, PARAM, clamp, alea, triangulaire, choisirRegion, choisirParmi, variante, poisson,
-    tuer, journaliser, popTotale, stabiliteMoyenne, bascule, fr,
+    tuer, journaliser, trouverEvenement, popTotale, popDe, stabiliteMoyenne, bascule, fr,
   };
 
   return {

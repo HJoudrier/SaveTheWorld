@@ -33,15 +33,15 @@ const Panneaux = (() => {
   }
 
   function entreeHTML(e, ctx) {
-    const { fr, st } = ctx;
-    const region = e.region ? st.regions.find(r => r.id === e.region) : null;
+    const { fr } = ctx;
     return `<li class="entree" style="--c:${COUL_TYPE[e.type] || 'var(--trait)'}">
       <div class="tete"><span class="an">${dateTexte(e.date)}</span><h3>${esc(e.titre)}</h3>
-        ${e.gravite >= 3 ? '<span class="badge">grave</span>' : ''}</div>
+        ${e.gravite >= 3 ? '<span class="badge">grave</span>' : ''}
+        ${e.id ? `<button type="button" class="lien-detail" data-evt="${e.id}" aria-label="Détails : ${esc(e.titre)}">Détails</button>` : ''}</div>
       <p class="texte">${esc(e.texte)}</p>
       ${e.morts ? `<p class="morts">Victimes estimées : ${morts(e.morts, fr)}</p>` : ''}
       ${e.lecon ? `<p class="lecon">${esc(e.lecon)}</p>` : ''}
-      ${e.confiance ? `<p class="conf">${esc(e.confiance)}</p>` : ''}${region && !e.titre.includes(region.court) ? `<p class="conf">${esc(region.nom)}</p>` : ''}</li>`;
+      ${e.confiance ? `<p class="conf">${esc(e.confiance)}</p>` : ''}</li>`;
   }
 
   // --- Ce qui est en cours dans le monde ---------------------------------------------
@@ -51,17 +51,17 @@ const Panneaux = (() => {
     const lignes = [];
     for (const w of st.actifs.guerres) {
       lignes.push({ coul: COUL_TYPE.guerre, titre: `Guerre ${INTENSITES[w.intensite]} : ${nom(w.region)}`,
-        detail: `depuis ${w.debut}${w.cause ? `, ${CAUSES[w.cause]}` : ''}`, ordre: 0 - w.intensite });
+        detail: `depuis ${w.debut}${w.cause ? `, ${CAUSES[w.cause]}` : ''}`, ordre: 0 - w.intensite, evt: w.evtId });
     }
-    for (const f of st.actifs.famines) lignes.push({ coul: COUL_TYPE.famine, titre: `Famine : ${nom(f.region)}`, detail: `depuis ${f.debut}`, ordre: 1 });
+    for (const f of st.actifs.famines) lignes.push({ coul: COUL_TYPE.famine, titre: `Famine : ${nom(f.region)}`, detail: `depuis ${f.debut}`, ordre: 1, evt: f.evtId });
     for (const e of st.actifs.epidemies) {
       lignes.push({ coul: COUL_TYPE.epidemie, titre: e.portee === 'monde' ? `Pandémie` : `Épidémie de ${e.nom} : ${nom(e.portee)}`,
-        detail: `depuis ${e.debut}`, ordre: e.portee === 'monde' ? 0 : 2 });
+        detail: `depuis ${e.debut}`, ordre: e.portee === 'monde' ? 0 : 2, evt: e.evtId });
     }
     for (const r of st.regions) if (r.crise) lignes.push({ coul: COUL_TYPE.crise, titre: `Crise sociale : ${r.court}`, detail: 'institutions défaillantes', ordre: 1 });
     lignes.sort((a, b) => a.ordre - b.ordre);
     if (!lignes.length) return '<p class="intro-panneau">Aucune guerre, famine, épidémie ni crise en cours.</p>';
-    return `<ul class="encours">${lignes.map(l => `<li style="--c:${l.coul}"><strong>${esc(l.titre)}</strong><span>${esc(l.detail)}</span></li>`).join('')}</ul>`;
+    return `<ul class="encours">${lignes.map(l => `<li style="--c:${l.coul}"><strong>${esc(l.titre)}</strong><span>${esc(l.detail)}</span>${l.evt ? `<button type="button" class="lien-detail" data-evt="${l.evt}" aria-label="Détails : ${esc(l.titre)}">Détails</button>` : ''}</li>`).join('')}</ul>`;
   }
 
   // --- Onglet Événements --------------------------------------------------------------
@@ -173,6 +173,64 @@ const Panneaux = (() => {
       </dl>`;
   }
 
+
+
+  // --- Fiche de détail d'un événement ------------------------------------------------------
+  const NOM_CAT = { climat: 'Climat', guerre: 'Guerre', famine: 'Famine', epidemie: 'Épidémie', revolte: 'Révolte ou révolution', eco: 'Économie',
+    ressource: 'Ressources', bascule: 'Point de bascule', crise: 'Crise régionale', politique: 'Politique et société', migration: 'Migrations' };
+
+  // Carte schématique où les régions concernées sont colorées
+  function miniCarte(ctx, ids, coul) {
+    const { st, carte } = ctx;
+    const touchees = new Set(ids);
+    let terres = '', noms = '';
+    for (const r of st.regions) {
+      const sel = touchees.has(r.id);
+      terres += carte.CARTE[r.id].map(pt => `<path d="${carte.chemin(pt)}" fill="${sel ? coul : 'var(--surface-2)'}" fill-opacity="${sel ? 0.85 : 1}" stroke="var(--fond)" stroke-width="0.8" stroke-linejoin="round"/>`).join('');
+      if (sel) { const [x, y] = carte.proj(carte.ETIQUETTES[r.id]); noms += `<text class="nom halo" x="${x}" y="${y}" text-anchor="middle">${esc(r.court)}</text>`; }
+    }
+    return `<svg viewBox="0 0 700 281" role="img" aria-label="Carte des zones concernées">${terres}${noms}</svg>`;
+  }
+
+  function detail(ctx, id) {
+    const { st, fr, popTexte } = ctx;
+    const e = st.journal.find(x => x.id === id);
+    if (!e) return '<p>Événement introuvable.</p>';
+    const coul = COUL_TYPE[e.type] || 'var(--encre-2)';
+    const ids = e.regions || (e.region ? [e.region] : st.regions.map(r => r.id));
+    const monde = !e.regions && !e.region;
+    const zones = ids.map(i => st.regions.find(r => r.id === i)).filter(Boolean);
+    const popZones = zones.reduce((a, r) => a + r.pop, 0);
+    const h = st.hist.find(x => x.a === e.annee);
+    const photo = typeof Photos !== 'undefined' ? Photos.pour(e.photo || e.type, e.id) : null;
+
+    const lignes = [];
+    lignes.push(['Zones concernées', monde ? 'Monde entier' : zones.map(r => esc(r.nom)).join(', ')]);
+    lignes.push([`Population de ${monde ? 'la planète' : zones.length > 1 ? 'ces zones' : 'cette zone'} aujourd’hui`, popTexte(popZones)]);
+    lignes.push([esc(e.labelTouches || 'Personnes touchées (estimation)'), e.touches != null && e.touches > 0 ? morts(e.touches, fr) : (e.touches === 0 ? 'pas encore de cas' : 'non applicable')]);
+    lignes.push([e.enCours ? 'Morts jusqu’ici' : 'Morts', e.morts ? morts(e.morts, fr) : (e.enCours ? 'pas de décès recensé' : 'aucune victime directe')]);
+    if (e.enCours === true) lignes.push(['Situation', `en cours depuis ${dateTexte(e.date)}`]);
+    else if (e.enCours === false) lignes.push(['Situation', `terminé en ${e.fin}${e.fin - e.annee > 0 ? ` (${e.fin - e.annee} an${e.fin - e.annee > 1 ? 's' : ''})` : ''}`]);
+    if (h) {
+      lignes.push(['Réchauffement mondial cette année-là', `+${fr(h.T, 2)}${NB}°C`]);
+      lignes.push(['Population mondiale cette année-là', popTexte(h.pop)]);
+    }
+    for (const [k, v] of e.details || []) lignes.push([esc(k), esc(v)]);
+
+    const fig = photo ? `<figure class="photo"><img src="${esc(photo.fichier)}" alt="${esc(photo.legende)}" loading="lazy">
+      <figcaption>Photo d’illustration, sans lien avec cet événement simulé : ${esc(photo.legende)}. ${esc(photo.auteur)}${photo.licence ? `, ${photo.lienLicence ? `<a href="${esc(photo.lienLicence)}" target="_blank" rel="noopener">${esc(photo.licence)}</a>` : esc(photo.licence)}` : ''}${photo.source ? `, <a href="${esc(photo.source)}" target="_blank" rel="noopener">source</a>` : ''}.</figcaption></figure>` : '';
+
+    return `<div class="detail-evt" style="--c:${coul}">${fig}
+      <p class="meta-evt"><span class="an">${dateTexte(e.date)}</span> <span class="badge" style="background:${coul}">${NOM_CAT[e.cat] || e.cat}</span>
+        ${e.gravite >= 3 ? '<span class="badge">grave</span>' : ''}</p>
+      <h2 id="evt-titre">${esc(e.titre)}</h2>
+      <p class="accroche">${esc(e.texte)}</p>
+      <dl class="deltas">${lignes.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+      <div class="carte mini">${miniCarte(ctx, ids, coul)}</div>
+      ${e.lecon ? `<p class="lecon">${esc(e.lecon)}</p>` : ''}
+      ${e.confiance ? `<p class="conf">${esc(e.confiance)}</p>` : ''}
+      <p class="conf">Les nombres de personnes touchées et de morts sont des estimations du jeu, calculées à partir de l’état de la simulation.</p></div>`;
+  }
 
   // --- Onglet Population : démographie, migrations et courbes à la manière de World3 ------
   const sum = l => l.reduce((a, b) => a + b, 0);
@@ -298,5 +356,5 @@ const Panneaux = (() => {
       </dl>`;
   }
 
-  return { dateTexte, morts, entreeHTML, societe, evenements, population, COUL_TYPE, COUL_REGION, INTENSITES };
+  return { dateTexte, morts, entreeHTML, societe, evenements, population, detail, COUL_TYPE, COUL_REGION, INTENSITES };
 })();
