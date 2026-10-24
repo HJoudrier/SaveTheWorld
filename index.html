@@ -19,6 +19,7 @@
       <div><dt>Réchauffement</dt><dd id="m-temp">—</dd></div>
       <div class="opt"><dt>CO₂ dans l’air</dt><dd id="m-ppm">—</dd></div>
       <div class="opt"><dt>Population</dt><dd id="m-pop">—</dd></div>
+      <div class="opt"><dt>Réfugiés climatiques</dt><dd id="m-ref">—</dd></div>
       <div class="opt"><dt>Inégalités</dt><dd id="m-gini">—</dd></div>
       <div class="opt"><dt>Démocratie</dt><dd id="m-demo">—</dd></div>
       <div><dt>Capital<span class="long"> politique</span></dt><dd id="m-cap">—</dd></div>
@@ -48,6 +49,7 @@
       <button type="button" role="tab" id="t-ressources" data-o="ressources" aria-controls="p-ressources">Ressources</button>
       <button type="button" role="tab" id="t-spheres" data-o="spheres" aria-controls="p-spheres">Sphères</button>
       <button type="button" role="tab" id="t-societe" data-o="societe" aria-controls="p-societe">Société</button>
+      <button type="button" role="tab" id="t-population" data-o="population" aria-controls="p-population">Population</button>
       <button type="button" role="tab" id="t-evenements" data-o="evenements" aria-controls="p-evenements">Événements</button>
     </div>
     <div id="p-politiques" role="tabpanel" aria-labelledby="t-politiques" tabindex="0"></div>
@@ -55,6 +57,7 @@
     <div id="p-ressources" role="tabpanel" aria-labelledby="t-ressources" tabindex="0" hidden></div>
     <div id="p-spheres" role="tabpanel" aria-labelledby="t-spheres" tabindex="0" hidden></div>
     <div id="p-societe" role="tabpanel" aria-labelledby="t-societe" tabindex="0" hidden></div>
+    <div id="p-population" role="tabpanel" aria-labelledby="t-population" tabindex="0" hidden></div>
     <div id="p-evenements" role="tabpanel" aria-labelledby="t-evenements" tabindex="0" hidden></div>
   </section>
 </main>
@@ -74,7 +77,7 @@
       <li>Le donut est votre tableau de bord. L’anneau vert est l’espace sûr et juste : au-delà, les limites planétaires sont dépassées ; en dessous, des besoins humains ne sont pas couverts.</li>
       <li>Le temps s’écoule en continu : à vitesse normale, une minute vaut une année. Mettez en pause ou accélérez jusqu’à ×60 ; vous pouvez régler vos politiques à tout moment.</li>
       <li>Répartissez votre capital politique entre neuf politiques. Chacune ne peut monter que d’un niveau tous les 5 ans, et le capital baisse en cas de guerre ou de crise.</li>
-      <li>Tout est relié : une solution peut créer un problème ailleurs. Guerres, famines, épidémies, révoltes et catastrophes climatiques apparaissent dans l’onglet Événements ; inégalités et démocratie, dans l’onglet Société. Les points de bascule sont cachés.</li>
+      <li>Tout est relié : une solution peut créer un problème ailleurs. Guerres, famines, épidémies, révoltes, migrations et catastrophes climatiques apparaissent dans l’onglet Événements ; inégalités et démocratie, dans l’onglet Société ; population, réfugiés et flux migratoires, dans l’onglet Population. Les points de bascule sont cachés.</li>
     </ul>
     <p class="graine">Prototype : les chiffres de départ sont des ordres de grandeur arrondis et le modèle est volontairement simplifié.</p>
     <div class="actions" id="intro-actions"></div>
@@ -95,6 +98,7 @@
 
 <script src="js/moteur.js"></script>
 <script src="js/societe.js"></script>
+<script src="js/migrations.js"></script>
 <script src="js/carte.js"></script>
 <script src="js/panneaux.js"></script>
 <script src="js/interface.js"></script>

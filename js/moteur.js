@@ -11,7 +11,7 @@ const Atterrir = (() => {
   const CATEGORIES = [                      // catégories d'événements affichées dans le journal
     { id: 'climat', nom: 'Climat' }, { id: 'guerre', nom: 'Guerres' }, { id: 'famine', nom: 'Famines' },
     { id: 'epidemie', nom: 'Épidémies' }, { id: 'revolte', nom: 'Révoltes et révolutions' },
-    { id: 'crise', nom: 'Crises régionales' }, { id: 'eco', nom: 'Économie et technologie' },
+    { id: 'migration', nom: 'Migrations' }, { id: 'crise', nom: 'Crises régionales' }, { id: 'eco', nom: 'Économie et technologie' },
     { id: 'ressource', nom: 'Ressources' }, { id: 'bascule', nom: 'Points de bascule' }, { id: 'politique', nom: 'Politique et société' },
   ];
   const modules = [];                       // modules optionnels (société, etc.) branchés sur le moteur
@@ -64,7 +64,7 @@ const Atterrir = (() => {
       effet: 'Recyclage, réparation, réemploi : moins de métaux extraits et moins de pollutions.',
       revers: 'Effet lent, à anticiper.' },
     { id: 'solidarite', nom: 'Solidarité et adaptation', sphere: 'anthropo',
-      effet: 'Finance l’adaptation et la transition des régions vulnérables.',
+      effet: 'Finance l’adaptation, la transition et l’accueil des déplacés dans les régions vulnérables.',
       revers: 'Un peu moins de croissance et de stabilité dans les régions riches.' },
   ];
 
@@ -638,6 +638,7 @@ const Atterrir = (() => {
       a: st.year, T: g.T, em: g.emissions, pop, pib: st.regions.reduce((a, r) => a + r.pop * r.yEff, 0) / 1e6,
       petrole: g.prodPetrole / 6, prises: g.prises, foret: g.foret, bii: g.bii, S: stabiliteMoyenne(st),
       mer: g.mer, metaux: g.metaux, poissons: g.poissons, K: g.K, phi: g.phi,
+      popR: st.regions.map(r => r.pop), res: (g.petrole / g.petrole0 + g.metaux / g.metaux0) / 2, nouv: g.nouvelles,
     };
     for (const m of modules) if (m.instantane) Object.assign(h, m.instantane(st));
     return h;
@@ -646,7 +647,10 @@ const Atterrir = (() => {
   // --- Écoulement du temps ---------------------------------------------------
   // L'état `st` contient toujours l'année en cours de traversée déjà calculée (st.year) ; `st.prec` garde
   // l'état de l'année précédente, pour que l'interface affiche une évolution continue entre les deux.
-  function snapshot(st) { return { g: { ...st.g }, regions: st.regions.map(r => ({ ...r })), morts: { ...st.morts } }; }
+  function snapshot(st) {
+    return { g: { ...st.g }, regions: st.regions.map(r => ({ ...r })), morts: { ...st.morts },
+      migr: st.migr ? { stock: { ...st.migr.stock }, cum: { ...st.migr.cum } } : null };
+  }
 
   function calculerAnnee(st) {
     st.prec = snapshot(st);
@@ -687,7 +691,9 @@ const Atterrir = (() => {
       for (const k in b) if (typeof b[k] === 'number' && typeof a[k] === 'number') o[k] = a[k] + (b[k] - a[k]) * f;
       return o;
     };
-    return { ...st, g: mix(st.prec.g, st.g), regions: st.regions.map((r, i) => mix(st.prec.regions[i], r)), morts: mix(st.prec.morts, st.morts) };
+    const v = { ...st, g: mix(st.prec.g, st.g), regions: st.regions.map((r, i) => mix(st.prec.regions[i], r)), morts: mix(st.prec.morts, st.morts) };
+    if (st.migr && st.prec.migr) v.migr = { ...st.migr, stock: mix(st.prec.migr.stock, st.migr.stock), cum: mix(st.prec.migr.cum, st.migr.cum) };
+    return v;
   }
 
   // --- Indicateurs agrégés pour l'interface ----------------------------------

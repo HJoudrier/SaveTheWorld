@@ -11,7 +11,7 @@ const Panneaux = (() => {
   const COUL_TYPE = {
     debut: 'var(--encre-2)', politique: 'var(--encre-2)', climat: 'var(--atmo)', guerre: 'var(--alerte)', paix: 'var(--donut)',
     famine: 'var(--ocre)', epidemie: 'var(--manque)', revolte: 'var(--anthropo)', revolution: 'var(--anthropo)',
-    eco: 'var(--hydro)', ressource: 'var(--litho)', bascule: 'var(--alerte)', crise: 'var(--manque)', sortie: 'var(--donut)',
+    eco: 'var(--hydro)', migration: 'var(--cryo)', ressource: 'var(--litho)', bascule: 'var(--alerte)', crise: 'var(--manque)', sortie: 'var(--donut)',
   };
   const COUL_REGION = { nam: 'var(--hydro)', sam: 'var(--donut)', eur: 'var(--manque)', afr: 'var(--ocre)', asi: 'var(--alerte)', oce: 'var(--cryo)' };
   const INTENSITES = ['', 'locale', 'majeure', 'totale'];
@@ -26,6 +26,7 @@ const Panneaux = (() => {
 
   // Victimes, en millions
   function morts(m, fr) {
+    if (m >= 1000) return `${fr(m / 1000, 1)}${NB}milliard${m >= 2000 ? 's' : ''}`;
     if (m < 0.01) return `moins de 10${NB}000`;
     if (m < 1) return `${fr(Math.round(m * 100) * 10, 0)}${NB}000`;
     return `${fr(m, m < 10 ? 1 : 0)}${NB}million${m >= 2 ? 's' : ''}`;
@@ -172,5 +173,130 @@ const Panneaux = (() => {
       </dl>`;
   }
 
-  return { dateTexte, morts, entreeHTML, societe, evenements, COUL_TYPE, COUL_REGION, INTENSITES };
+
+  // --- Onglet Population : démographie, migrations et courbes à la manière de World3 ------
+  const sum = l => l.reduce((a, b) => a + b, 0);
+
+  // Flèches des flux migratoires entre régions (largeur = personnes accueillies par an)
+  function carteFlux(ctx) {
+    const { st, fr, carte } = ctx;
+    const pos = id => carte.proj(carte.ETIQUETTES[id]).map(Number);
+    const flux = Object.entries(st.migr.flux).map(([k, v]) => ({ o: k.split('>')[0], d: k.split('>')[1], v }))
+      .filter(f => f.v >= 0.03).sort((a, b) => b.v - a.v).slice(0, 14);
+    const vmax = Math.max(0.1, ...flux.map(f => f.v));
+    let terres = '', fleches = '', noms = '';
+    for (const r of st.regions) {
+      terres += carte.CARTE[r.id].map(pt => `<path d="${carte.chemin(pt)}" fill="var(--surface-2)" stroke="var(--fond)" stroke-width="0.8" stroke-linejoin="round"/>`).join('');
+      const [x, y] = pos(r.id);
+      noms += `<text class="nom halo" x="${x}" y="${y}" text-anchor="middle">${r.court}</text>
+        <text class="val halo" x="${x}" y="${y + 15}" text-anchor="middle">${r.solde >= 0 ? '+' : '−'}${fr(Math.abs(r.solde), 1)}${NB}M/an</text>`;
+    }
+    for (const f of flux) {
+      const [x1, y1] = pos(f.o), [x2, y2] = pos(f.d);
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len, c = 26;                              // raccourcit pour ne pas recouvrir les noms
+      const ax = x1 + ux * c, ay = y1 + uy * c + 18, bx = x2 - ux * c, by = y2 - uy * c + 18;
+      const cx = (ax + bx) / 2 - uy * len * 0.18, cy = (ay + by) / 2 + ux * len * 0.18;
+      const w = 1.2 + 7 * Math.sqrt(f.v / vmax);
+      const nom = id => st.regions.find(r => r.id === id).court;
+      fleches += `<path d="M${ax.toFixed(1)} ${ay.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}" fill="none"
+        stroke="var(--anthropo)" stroke-opacity="0.75" stroke-width="${w.toFixed(1)}" stroke-linecap="round" marker-end="url(#pointe)">
+        <title>${nom(f.o)} vers ${nom(f.d)} : ${fr(f.v, 2)} million de personnes par an</title></path>`;
+    }
+    return `<svg viewBox="0 0 700 281" role="img" aria-label="Flux migratoires entre les régions">
+      <defs><marker id="pointe" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--anthropo)"/></marker></defs>
+      ${terres}${fleches}${noms}</svg>`;
+  }
+
+  // Population mondiale par région, en aires empilées
+  function aires(ctx, w = 320, h = 190) {
+    const { st, fr } = ctx, hist = st.hist, R = st.regions;
+    if (hist.length < 2) return '';
+    const ml = 36, mr = 12, mt = 8, mb = 22, x0 = 2025, x1 = 2100;
+    const tot = hist.map(x => sum(x.popR));
+    const ymax = Math.max(10000, Math.ceil(Math.max(...tot) / 2000) * 2000);
+    const X = x => (ml + (x - x0) / (x1 - x0) * (w - ml - mr)).toFixed(1), Y = y => (mt + (1 - y / ymax) * (h - mt - mb)).toFixed(1);
+    let sv = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Population mondiale par région">`;
+    for (let v = 0; v <= ymax; v += 2000) sv += `<line class="axe" x1="${ml}" x2="${w - mr}" y1="${Y(v)}" y2="${Y(v)}"/><text class="tick" x="${ml - 6}" y="${+Y(v) + 4}" text-anchor="end">${v / 1000}${NB}Md</text>`;
+    for (const x of [2025, 2050, 2075, 2100]) sv += `<text class="tick" x="${X(x)}" y="${h - 5}" text-anchor="middle">${x}</text>`;
+    let base = hist.map(() => 0);
+    R.forEach((r, i) => {
+      const haut = hist.map((x, k) => base[k] + x.popR[i]);
+      const d = 'M' + hist.map((x, k) => `${X(x.a)} ${Y(haut[k])}`).join('L') + 'L' + hist.map((x, k) => `${X(x.a)} ${Y(base[k])}`).reverse().join('L') + 'Z';
+      sv += `<path d="${d}" fill="${COUL_REGION[r.id]}" fill-opacity="0.85"/>`;
+      base = haut;
+    });
+    return sv + '</svg>';
+  }
+
+  function population(ctx) {
+    const { st, fr, signe, courbe, popTexte } = ctx;
+    const R = st.regions, m = st.migr, h = st.hist, h0 = h[0];
+    const pop = sum(R.map(r => r.pop));
+    const hmax = h.reduce((a, x) => (x.pop > a.pop ? x : a), h[0]);
+    const pic = pop > hmax.pop ? { pop, a: Math.floor(st.t) } : hmax;
+    const croiss = h.length > 1 ? h[h.length - 1].pop / h[h.length - 2].pop - 1 : 0;
+    const fluxIntl = sum(Object.values(m.flux));
+    const departs = sum(R.map(r => r.dep)), departsHC = sum(R.map(r => r.depConf + r.depAutre));
+
+    const cartes = [
+      carte('Population mondiale', `${popTexte(pop)}`,
+        `${signe(croiss * 100, 2)}${NB}% sur la dernière année. Pic jusqu’ici : ${popTexte(pic.pop)}, en ${pic.a}.`, 'var(--encre)'),
+      carte('Réfugiés climatiques', `${morts(m.stock.clim, fr)}`,
+        `Personnes aujourd’hui déplacées par le climat. Depuis 2025 : ${morts(m.cum.clim, fr)}.`, 'var(--cryo)'),
+      carte('Déplacés par la guerre et la faim', `${morts(m.stock.conflit + m.stock.autre, fr)}`,
+        `Départs de l’année : ${morts(departsHC, fr)}.`, 'var(--alerte)'),
+      carte('Migrations entre régions', `${morts(fluxIntl, fr)}<small>par an</small>`,
+        `Sur ${morts(departs, fr)} de départs cette année, environ 70${NB}% restent dans leur pays ou leur région d’origine.`, 'var(--anthropo)'),
+    ].join('');
+
+    const lignes = R.map(r => {
+      const al = m.alertes[r.id], ferme = al && al.ferme;
+      return `<tr><th scope="row"><span class="pastille" style="--c:${COUL_REGION[r.id]}"></span>${r.court}</th>
+        <td>${popTexte(r.pop)}</td><td>${morts(r.dep, fr)}</td><td>${morts(r.depClim, fr)}</td><td>${morts(r.arr, fr)}</td>
+        <td>${r.solde >= 0 ? '+' : '−'}${morts(Math.abs(r.solde), fr)}</td>
+        <td>${ferme ? '<span class="badge violet">fermées</span>' : `${Math.round(r.ouv * 100)}${NB}%`}</td></tr>`;
+    }).join('');
+
+    // Courbes à la manière du modèle World3 (Meadows et al., 1972) : plusieurs grandeurs, indice 100 en 2025
+    const idx = (k, ref) => h.map(x => [x.a, x[k] / ref * 100]);
+    const S3 = [
+      { nom: 'Population', coul: 'var(--encre)', pts: idx('pop', h0.pop) },
+      { nom: 'Production (PIB)', coul: 'var(--hydro)', pts: idx('pib', h0.pib) },
+      { nom: 'Nourriture', coul: 'var(--donut)', pts: idx('phi', h0.phi) },
+      { nom: 'Ressources restantes', coul: 'var(--litho)', pts: idx('res', h0.res) },
+      { nom: 'Pollution (entités nouvelles)', coul: 'var(--manque)', pts: idx('nouv', h0.nouv) },
+      { nom: 'Stabilité sociale', coul: 'var(--ocre)', pts: idx('S', h0.S) },
+    ];
+    const vmax = Math.max(150, ...S3.flatMap(x => x.pts.map(p => p[1])));
+    const ymax = Math.ceil(vmax / 50) * 50;
+    const ticks = []; for (let v = 0; v <= ymax; v += ymax > 300 ? 100 : 50) ticks.push(v);
+    const legende = S3.map(x => `<span style="--c:${x.coul}">${x.nom}</span>`).join('');
+    const world3 = courbe({ series: S3.map(x => ({ pts: x.pts, coul: x.coul })), ymin: 0, ymax, yticks: ticks, w: 640, h: 270,
+      label: 'Population, production, nourriture, ressources, pollution et stabilité, en indice 100 en 2025' });
+
+    return `
+      <p class="intro-panneau">La population mondiale, les déplacements forcés et les routes migratoires entre régions. Les migrations dépendent du climat, des guerres, de la faim et des crises ; elles pèsent à leur tour sur les régions d’accueil.</p>
+      <div class="blocs">${cartes}</div>
+      <h3 class="titre-section">Flux migratoires de l’année</h3>
+      <div class="carte">${carteFlux(ctx)}</div>
+      <p class="note-carte">Largeur des flèches : personnes accueillies dans une autre région. Sous le nom de chaque région : solde migratoire annuel. Les déplacements internes, majoritaires, ne sont pas dessinés.</p>
+      <div class="defile"><table class="tableau">
+        <thead><tr><th scope="col">Région</th><th scope="col">Population</th><th scope="col">Départs forcés</th><th scope="col">dont climat</th><th scope="col">Arrivées</th><th scope="col">Solde</th><th scope="col">Accueil</th></tr></thead>
+        <tbody>${lignes}</tbody></table></div>
+      <h3 class="titre-section">Courbes à la manière de World3</h3>
+      <p class="intro-panneau">Plusieurs grandeurs sur le même graphique, en indice 100 en 2025, comme dans « Les limites à la croissance » (1972). Le modèle World3 a connu des mises à jour, dont une recalibration récente (Nebel et al., 2023) qui conclut que son scénario de référence aboutit toujours à un dépassement suivi d’un déclin. Atterrir n’est pas une réplique de World3 : c’est un jeu, bien plus simple sur certains points et plus détaillé sur d’autres (régions, politiques, événements).</p>
+      <p class="legende">${legende}</p>
+      <div class="courbes une"><figure><figcaption>Population, production, nourriture, ressources et pollution</figcaption>${world3}</figure></div>
+      <h3 class="titre-section">Population par région</h3>
+      <p class="legende">${R.map(r => `<span style="--c:${COUL_REGION[r.id]}">${r.court}</span>`).join('')}</p>
+      <div class="courbes une"><figure><figcaption>Population mondiale (milliards)</figcaption>${aires(ctx, 640, 230)}</figure></div>
+      <h3 class="titre-section">Repères</h3>
+      <dl class="reperes">
+        <dt>Réfugiés climatiques</dt><dd>Personnes qui doivent quitter leur foyer à cause de la chaleur, des sécheresses, des tempêtes ou de la montée des eaux. Ce n’est pas un statut juridique : la convention de Genève ne le prévoit pas. Les estimations sont très incertaines. La Banque mondiale (Groundswell, 2021) projette jusqu’à 216 millions de migrants climatiques internes d’ici 2050 dans son scénario le plus pessimiste ; seule une action rapide sur les émissions peut réduire ce chiffre de façon importante. Des milliards de personnes ne pourraient être concernées que dans un monde bien plus chaud que celui de ce jeu, ou en cumulant sur plusieurs décennies.</dd>
+        <dt>Départs internes et internationaux</dt><dd>La plupart des déplacés restent dans leur pays ou leur région. Une part des départs prend la route d’une autre région, selon la proximité et l’attrait économique ; l’accueil se ferme quand les arrivées nourrissent le rejet et les tensions.</dd>
+      </dl>`;
+  }
+
+  return { dateTexte, morts, entreeHTML, societe, evenements, population, COUL_TYPE, COUL_REGION, INTENSITES };
 })();

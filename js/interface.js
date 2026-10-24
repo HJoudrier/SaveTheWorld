@@ -43,6 +43,7 @@
   const popTot = () => st.regions.reduce((a, r) => a + r.pop, 0);
   const moy = f => st.regions.reduce((a, r) => a + f(r) * r.pop, 0) / popTot();
   const doublement = g => (g > 0.0005 ? Math.round(Math.log(2) / Math.log(1 + g)) : null);
+  const compact = m => (m >= 1000 ? `${fr(m / 1000, 2)}${NB}Md` : `${fr(m, 0)}${NB}M`);
   const popTexte = m => (m >= 1000 ? `${fr(m / 1000, 2)}${NB}milliards` : `${fr(m, 0)}${NB}millions`);
   const def = id => A.BASCULES.find(b => b.id === id);
   const bascule = id => st.bascules.find(b => b.id === id);
@@ -67,7 +68,7 @@
   // `etat` est l'état du moteur ; `st` en est la vue à l'instant présent (grandeurs interpolées entre deux années).
   function majVue() { st = A.vue(etat); }
   const PANNEAUX = () => ({ politiques: rendrePolitiques, regions: rendreRegions, ressources: rendreRessources,
-    spheres: rendreSpheres, societe: rendreSociete, evenements: rendreEvenements });
+    spheres: rendreSpheres, societe: rendreSociete, population: rendrePopulation, evenements: rendreEvenements });
 
   function rendre() {
     majVue();
@@ -106,6 +107,7 @@
     $('#m-temp').textContent = deg(g.T);
     $('#m-ppm').textContent = `${Math.round(g.ppm)}${NB}ppm`;
     $('#m-pop').textContent = popTexte(popTot());
+    $('#m-ref').textContent = compact(st.migr.stock.clim);
     $('#m-gini').textContent = fr(moy(r => r.gini), 2);
     $('#m-demo').innerHTML = `${Math.round(moy(r => r.demo))} <small>/100</small>`;
     const cap = $('#m-cap');
@@ -407,6 +409,8 @@
         <div><dt>Émissions de CO₂</dt><dd>${fr(r.co2, 1)}${NB}Gt/an</dd></div>
         <div><dt>Stabilité sociale</dt><dd>${Math.round(r.S)}/100<div class="barre-mini" style="--c:${sc}"><i style="width:${r.S}%"></i></div></dd></div>
         <div><dt>Alimentation</dt><dd>${fr(r.food, 2)} <small>1 = besoins couverts</small></dd></div>
+        <div><dt>Départs forcés</dt><dd>${compact(r.dep)}<small>/an</small> <small>dont climat ${compact(r.depClim)}</small></dd></div>
+        <div><dt>Solde migratoire</dt><dd>${r.solde >= 0 ? '+' : '−'}${compact(Math.abs(r.solde))}<small>/an</small></dd></div>
         <div><dt>Inégalités (Gini)</dt><dd>${fr(r.gini, 2)}</dd></div>
         <div><dt>Démocratie</dt><dd>${Math.round(r.demo)}/100<div class="barre-mini" style="--c:var(--hydro)"><i style="width:${r.demo}%"></i></div></dd></div>
         <div><dt>Tensions</dt><dd>${Math.round(r.tension)}/100<div class="barre-mini" style="--c:var(--alerte)"><i style="width:${r.tension}%"></i></div></dd></div>
@@ -543,8 +547,9 @@
   }
 
   // ---------- Société et événements ----------
-  const ctxPanneau = () => ({ st, A, fr, pct, esc, popTexte, courbe, signe });
+  const ctxPanneau = () => ({ st, A, fr, pct, esc, popTexte, courbe, signe, carte: { CARTE, ETIQUETTES, proj, chemin } });
   function rendreSociete() { $('#p-societe').innerHTML = P.societe(ctxPanneau()); }
+  function rendrePopulation() { $('#p-population').innerHTML = P.population(ctxPanneau()); }
   function rendreEvenements() { $('#p-evenements').innerHTML = P.evenements(ctxPanneau(), filtreCat, severe); }
 
   // ---------- Onglets ----------
@@ -597,6 +602,8 @@
         <div><dt>Sous le plancher social</dt><dd>${pct(b.sous)}</dd></div>
         <div><dt>Hausse des mers</dt><dd>+${fr(b.mer * 100, 0)}${NB}cm</dd></div>
         <div><dt>Morts (guerres, famines, épidémies, catastrophes)</dt><dd>${P.morts(b.mortsTotal, fr)}</dd></div>
+        <div><dt>Déplacés climatiques depuis 2025</dt><dd>${P.morts(b.cumClim, fr)}</dd></div>
+        <div><dt>Déplacés par la guerre et la faim</dt><dd>${P.morts(b.cumConflit, fr)}</dd></div>
         <div><dt>Guerres déclenchées</dt><dd>${b.stats.guerres}</dd></div>
         <div><dt>Révolutions</dt><dd>${b.stats.revolutions}</dd></div>
         <div><dt>Démocratie en 2100</dt><dd>${Math.round(b.demo)}/100</dd></div>
