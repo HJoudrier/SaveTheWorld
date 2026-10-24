@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atterrir — un jeu sur les limites planétaires</title>
+<meta name="description" content="Prototype de jeu sur la collapsologie : croissance exponentielle, limites planétaires, ressources finies et climat, de 2025 à 2100.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --fond: #E6ECEE;
+  --surface: #F4F7F7;
+  --surface-2: #D8E2E6;
+  --encre: #12324A;
+  --encre-2: #4C6576;
+  --trait: #C2D0D6;
+  --donut: #4A7C47;
+  --donut-pale: #CBDFC6;
+  --ocre: #B0731A;
+  --alerte: #B3263E;
+  --manque: #7B3F6E;
+  --atmo: #4F86B0;
+  --hydro: #1F6688;
+  --cryo: #79AFC4;
+  --litho: #8C6A3C;
+  --bio: #4A7C47;
+  --anthropo: #7B3F6E;
+  --sans: 'Archivo', 'Helvetica Neue', Arial, system-ui, sans-serif;
+  --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --fond: #0E2131; --surface: #142C40; --surface-2: #1E3B52; --encre: #E2EBEE; --encre-2: #9BB2BF;
+    --trait: #2A4961; --donut: #79B074; --donut-pale: #1F4231; --ocre: #E0A748; --alerte: #EE6A7F;
+    --manque: #C98CC0; --atmo: #7FB2D8; --hydro: #4FA3C9; --cryo: #A8D3E3; --litho: #C49A62; --bio: #79B074; --anthropo: #C98CC0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --fond: #0E2131; --surface: #142C40; --surface-2: #1E3B52; --encre: #E2EBEE; --encre-2: #9BB2BF;
+  --trait: #2A4961; --donut: #79B074; --donut-pale: #1F4231; --ocre: #E0A748; --alerte: #EE6A7F;
+  --manque: #C98CC0; --atmo: #7FB2D8; --hydro: #4FA3C9; --cryo: #A8D3E3; --litho: #C49A62; --bio: #79B074; --anthropo: #C98CC0;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0; background: var(--fond); color: var(--encre);
+  font-family: var(--sans); font-size: 15px; line-height: 1.45; font-variant-numeric: tabular-nums;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30;
+  background: var(--fond);
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--hydro); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; line-height: 1.15; }
+p { margin: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Barre du haut ---------- */
+.barre {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--fond); border-bottom: 1px solid var(--trait);
+}
+.barre-in {
+  max-width: 1280px; margin: 0 auto; padding: 10px 24px;
+  display: flex; align-items: center; gap: 28px;
+}
+.marque {
+  font-size: 26px; font-weight: 800; font-stretch: 125%; letter-spacing: -0.01em; white-space: nowrap;
+}
+.mesures { display: flex; gap: 24px; margin: 0; flex: 1; flex-wrap: wrap; }
+.mesures div { display: flex; flex-direction: column; }
+.mesures dt { font-size: 12px; color: var(--encre-2); }
+.mesures dd { margin: 0; font-size: 18px; font-weight: 650; font-stretch: 112%; white-space: nowrap; }
+.mesures dd small { font-size: 12px; font-weight: 400; color: var(--encre-2); font-stretch: 100%; }
+.lien-aide {
+  background: none; border: 0; color: var(--encre-2); text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer; padding: 4px; font-size: 14px;
+}
+.avancer, .avancer-principal {
+  background: var(--encre); color: var(--fond); border: 0; border-radius: 999px;
+  padding: 11px 20px; font-weight: 650; font-size: 15px; cursor: pointer; white-space: nowrap;
+}
+.avancer:disabled { opacity: 0.45; cursor: not-allowed; }
+.dlg .avancer-principal { padding: 12px 22px; }
+.pied-mobile { display: none; }
+
+/* ---------- Grille principale ---------- */
+.jeu {
+  display: grid; grid-template-columns: minmax(330px, 460px) minmax(0, 1fr); gap: 36px;
+  max-width: 1280px; margin: 0 auto; padding: 22px 24px 48px;
+}
+.planete { position: sticky; top: 84px; align-self: start; }
+.donut svg { display: block; width: 100%; height: auto; overflow: visible; }
+.donut .zone { fill: transparent; cursor: pointer; outline: none; }
+.donut .zone:focus-visible { fill: color-mix(in oklab, var(--hydro) 12%, transparent); }
+.donut .zone:hover { fill: color-mix(in oklab, var(--encre) 6%, transparent); }
+.donut text { fill: var(--encre); font-family: var(--sans); }
+.donut .lbl { font-size: 15px; }
+.donut .lbl-soc { font-size: 12.5px; fill: var(--manque); font-weight: 600; }
+.donut .annee { font-size: 34px; font-weight: 800; font-stretch: 125%; }
+.donut .sous-annee { font-size: 12.5px; fill: var(--encre-2); }
+.detail-donut {
+  min-height: 66px; padding: 12px 14px; border-left: 3px solid var(--donut); background: var(--surface);
+  border-radius: 0 6px 6px 0; margin-top: 4px; font-size: 14px;
+}
+.detail-donut strong { display: block; font-size: 15px; }
+.detail-donut.alerte { border-left-color: var(--alerte); }
+.detail-donut.ocre { border-left-color: var(--ocre); }
+.detail-donut.manque { border-left-color: var(--manque); }
+.legende { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0; font-size: 12.5px; color: var(--encre-2); }
+.legende span::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px;
+  background: var(--c); vertical-align: -1px;
+}
+.bocal { display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: center; margin-top: 18px; }
+.bocal svg { width: 54px; height: auto; }
+.bocal p { font-size: 14px; }
+.bocal p + p { margin-top: 6px; color: var(--encre-2); }
+
+/* ---------- Onglets ---------- */
+.onglets {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--trait); margin-bottom: 18px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.onglets::-webkit-scrollbar { display: none; }
+.onglets button {
+  background: none; border: 0; padding: 10px 12px 11px; cursor: pointer; font-size: 15px;
+  color: var(--encre-2); border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.onglets button[aria-selected="true"] { color: var(--encre); border-bottom-color: var(--encre); font-weight: 650; }
+.onglets .pastille-notif {
+  display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px;
+  background: var(--alerte); color: #fff; font-size: 11.5px; line-height: 18px; text-align: center; font-weight: 650;
+}
+[role="tabpanel"][hidden] { display: none; }
+.intro-panneau { color: var(--encre-2); font-size: 14px; margin-bottom: 14px; max-width: 64ch; }
+
+/* ---------- Politiques ---------- */
+.budget { margin-bottom: 8px; }
+.budget-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.budget-tete strong { font-size: 17px; }
+.jauge-budget { display: flex; gap: 3px; margin: 8px 0 6px; }
+.jauge-budget i { flex: 1; height: 10px; border-radius: 2px; background: var(--surface-2); }
+.jauge-budget i.plein { background: var(--encre); }
+.jauge-budget i.trop { background: var(--alerte); }
+.budget .aide { font-size: 13px; color: var(--encre-2); }
+.budget.depasse .aide { color: var(--alerte); font-weight: 600; }
+.leviers { list-style: none; margin: 0; padding: 0; }
+.levier {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 20px; align-items: start;
+  padding: 14px 0; border-top: 1px solid var(--trait);
+}
+.levier h3 { font-size: 15.5px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.levier .effet { font-size: 14px; }
+.levier .revers { font-size: 13px; color: var(--encre-2); margin-top: 2px; }
+.levier .etat { font-size: 13px; color: var(--hydro); margin-top: 4px; }
+.pastille { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.reglage { text-align: right; }
+.niveaux { display: inline-flex; border: 1px solid var(--trait); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.niveaux button {
+  border: 0; background: none; width: 38px; height: 34px; cursor: pointer; font-weight: 650; font-size: 14px;
+}
+.niveaux button + button { border-left: 1px solid var(--trait); }
+.niveaux button[aria-pressed="true"] { background: var(--encre); color: var(--fond); }
+.niveaux button:disabled { color: color-mix(in oklab, var(--encre-2) 45%, transparent); cursor: not-allowed; }
+.reglage .cout { display: block; font-size: 12.5px; color: var(--encre-2); margin-top: 5px; }
+
+/* ---------- Régions ---------- */
+.choix { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.choix button {
+  border: 1px solid var(--trait); background: var(--surface); border-radius: 999px;
+  padding: 6px 12px; font-size: 13.5px; cursor: pointer;
+}
+.choix button[aria-pressed="true"] { background: var(--encre); color: var(--fond); border-color: var(--encre); }
+.carte svg { width: 100%; height: auto; display: block; }
+.carte .terre { stroke: var(--fond); stroke-width: 0.8; cursor: pointer; stroke-linejoin: round; }
+.carte .region:focus-visible .terre, .carte .region.sel .terre { stroke: var(--encre); stroke-width: 1.8; }
+.carte .region { outline: none; }
+.carte .lac { fill: var(--fond); }
+.carte .nom { font-family: var(--serif); font-style: italic; font-size: 13px; fill: var(--encre); pointer-events: none; }
+.carte .val { font-size: 12px; font-weight: 650; fill: var(--encre); pointer-events: none; }
+.carte .halo { paint-order: stroke; stroke: var(--fond); stroke-width: 3px; stroke-linejoin: round; }
+.echelle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--encre-2); margin: 6px 0 16px; }
+.echelle i { flex: 0 0 120px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--a), var(--b)); }
+.fiche { background: var(--surface); border-radius: 8px; padding: 16px 18px; }
+.fiche h3 { font-size: 19px; font-stretch: 112%; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.badge { font-size: 12px; font-weight: 650; padding: 2px 8px; border-radius: 999px; background: var(--alerte); color: #fff; font-stretch: 100%; }
+.fiche .phrase { font-family: var(--serif); font-size: 15px; line-height: 1.55; margin: 8px 0 12px; max-width: 62ch; }
+.chiffres { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px 18px; margin: 0; }
+.chiffres div { display: flex; flex-direction: column; }
+.chiffres dt { font-size: 12.5px; color: var(--encre-2); }
+.chiffres dd { margin: 0; font-size: 16px; font-weight: 600; }
+.chiffres dd small { font-weight: 400; color: var(--encre-2); font-size: 12.5px; }
+.barre-mini { height: 6px; border-radius: 3px; background: var(--surface-2); margin-top: 4px; overflow: hidden; }
+.barre-mini i { display: block; height: 100%; background: var(--c, var(--donut)); }
+
+/* ---------- Blocs ressources / sphères ---------- */
+.blocs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.bloc { background: var(--surface); border-radius: 8px; padding: 14px 16px; border-top: 3px solid var(--c, var(--trait)); }
+.bloc h3 { font-size: 16px; margin-bottom: 8px; }
+.bloc .chiffres { grid-template-columns: 1fr 1fr; }
+.bloc .note { font-size: 13px; color: var(--encre-2); margin-top: 10px; }
+.bloc .note.forte { color: var(--alerte); font-weight: 600; }
+.bloc svg { width: 100%; height: auto; display: block; margin-top: 10px; }
+.titre-section { font-size: 18px; font-stretch: 112%; margin: 26px 0 6px; }
+.bascules { list-style: none; padding: 0; margin: 10px 0 0; }
+.bascules li {
+  display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: 4px 16px; align-items: center;
+  padding: 10px 0; border-top: 1px solid var(--trait);
+}
+.bascules .nomb { font-weight: 600; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.bascules .stat { grid-column: 2; font-size: 12.5px; color: var(--encre-2); }
+.bascules .stat.franchi { color: var(--alerte); font-weight: 600; }
+.risque { position: relative; height: 14px; border-radius: 7px; background: var(--surface-2); overflow: hidden; }
+.risque .plage { position: absolute; top: 0; bottom: 0; border-radius: 7px; }
+.risque .t { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--encre); }
+.graduation { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--encre-2); margin-top: 2px; }
+
+/* ---------- Journal ---------- */
+.courbes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 8px; }
+.courbes figure { margin: 0; background: var(--surface); border-radius: 8px; padding: 12px 14px; }
+.courbes figcaption { font-size: 14px; font-weight: 650; }
+.courbes svg { width: 100%; height: auto; display: block; margin-top: 6px; }
+svg .axe { stroke: var(--trait); stroke-width: 1; }
+svg .tick { fill: var(--encre-2); font-size: 11px; font-family: var(--sans); }
+svg .ref { fill: none; stroke: var(--encre-2); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.55; }
+svg .ref-lbl { fill: var(--encre-2); font-size: 10px; font-family: var(--sans); }
+.entrees { list-style: none; padding: 0; margin: 0; }
+.entree { padding: 14px 0 14px 16px; border-top: 1px solid var(--trait); border-left: 3px solid var(--c, var(--trait)); margin-top: -1px; }
+.entree .tete { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.entree .an { font-weight: 800; font-stretch: 112%; font-size: 14px; color: var(--encre-2); }
+.entree h3 { font-size: 15.5px; }
+.entree .texte { font-family: var(--serif); font-size: 15px; line-height: 1.55; margin-top: 4px; max-width: 64ch; }
+.entree .lecon { font-family: var(--serif); font-style: italic; font-size: 14.5px; line-height: 1.5; margin-top: 6px; color: var(--encre-2); max-width: 64ch; }
+.entree .conf { font-size: 12px; color: var(--encre-2); margin-top: 6px; }
+
+/* ---------- Dialogues ---------- */
+dialog {
+  border: 0; border-radius: 12px; padding: 0; width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
+  background: var(--surface); color: var(--encre); box-shadow: 0 24px 60px rgba(8, 25, 38, 0.35);
+}
+dialog::backdrop { background: rgba(8, 25, 38, 0.55); }
+.dlg { padding: 24px 26px 22px; }
+.dlg h2 { font-size: 26px; font-weight: 800; font-stretch: 118%; }
+.dlg .accroche { font-family: var(--serif); font-size: 17px; line-height: 1.55; margin-top: 10px; }
+.dlg .regles { margin: 16px 0 0; padding-left: 20px; }
+.dlg .regles li { margin-bottom: 8px; }
+.dlg .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.secondaire {
+  background: none; border: 1px solid var(--trait); border-radius: 999px; padding: 10px 18px; cursor: pointer; font-weight: 600;
+}
+.deltas { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 16px 0 4px; }
+.deltas div { background: var(--fond); border-radius: 8px; padding: 8px 10px; }
+.deltas dt { font-size: 12px; color: var(--encre-2); }
+.deltas dd { margin: 0; font-weight: 650; font-size: 16px; }
+.deltas dd.mal { color: var(--alerte); }
+.deltas dd.bien { color: var(--donut); }
+.dlg .entrees { margin-top: 12px; }
+.fin-issue { font-family: var(--serif); font-size: 17px; line-height: 1.55; margin-top: 8px; }
+.dlg figure { margin: 16px 0 0; }
+.dlg figure svg { width: 100%; height: auto; display: block; }
+.dlg figcaption { font-size: 13px; color: var(--encre-2); margin-top: 4px; }
+.graine { font-size: 12.5px; color: var(--encre-2); margin-top: 12px; }
+
+/* ---------- Mobile ---------- */
+@media (max-width: 900px) {
+  body { font-size: 14.5px; }
+  .barre-in { padding: 8px 14px; gap: 14px; }
+  .marque { font-size: 20px; }
+  .mesures { gap: 16px; flex-wrap: nowrap; }
+  .mesures dd { font-size: 15.5px; }
+  .mesures .opt, .mesures .long, .barre .avancer, .barre .lien-aide { display: none; }
+  .carte .nom { font-size: 21px; }
+  .carte .val { font-size: 19px; }
+  .carte .halo { stroke-width: 4px; }
+  .jeu { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 12px 14px 110px; }
+  .planete { position: static; max-width: 460px; margin: 0 auto; width: 100%; }
+  .pied-mobile {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; gap: 12px; align-items: center;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border-top: 1px solid var(--trait);
+  }
+  .pied-mobile .avancer { flex: 1; padding: 13px 16px; }
+  .pied-mobile .lien-aide { flex: none; }
+  .levier { grid-template-columns: minmax(0, 1fr); }
+  .reglage { text-align: left; }
+  .bascules li { grid-template-columns: minmax(0, 1fr); }
+  .bascules .stat { grid-column: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .donut .ext, .donut .int { transition: opacity 0.4s ease; }
+  dialog[open] { animation: entree 0.22s ease-out; }
+  @keyframes entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}
+
+</style>
+</head>
+<body>
+<header class="barre">
+  <div class="barre-in">
+    <h1 class="marque">Atterrir</h1>
+    <dl class="mesures">
+      <div><dt>Année</dt><dd id="m-annee">2025</dd></div>
+      <div><dt>Réchauffement</dt><dd id="m-temp">—</dd></div>
+      <div class="opt"><dt>CO₂ dans l’air</dt><dd id="m-ppm">—</dd></div>
+      <div class="opt"><dt>Population</dt><dd id="m-pop">—</dd></div>
+      <div><dt>Capital<span class="long"> politique</span></dt><dd id="m-cap">—</dd></div>
+    </dl>
+    <button type="button" class="lien-aide">Règles</button>
+    <button type="button" class="avancer">Avancer</button>
+  </div>
+</header>
+
+<main class="jeu">
+  <section class="planete" aria-label="État de la planète">
+    <div class="donut" id="donut"></div>
+    <div class="detail-donut" id="detail-donut" aria-live="polite"></div>
+    <p class="legende">
+      <span style="--c:var(--donut-pale)">Espace sûr et juste</span>
+      <span style="--c:var(--ocre)">Limite franchie</span>
+      <span style="--c:var(--alerte)">Haut risque</span>
+      <span style="--c:var(--manque)">Besoins non couverts</span>
+    </p>
+    <div class="bocal" id="bocal"></div>
+  </section>
+
+  <section class="panneaux" aria-label="Commandes et informations">
+    <div class="onglets" role="tablist" aria-label="Panneaux du jeu">
+      <button type="button" role="tab" id="t-politiques" data-o="politiques" aria-controls="p-politiques">Politiques</button>
+      <button type="button" role="tab" id="t-regions" data-o="regions" aria-controls="p-regions">Régions</button>
+      <button type="button" role="tab" id="t-ressources" data-o="ressources" aria-controls="p-ressources">Ressources</button>
+      <button type="button" role="tab" id="t-spheres" data-o="spheres" aria-controls="p-spheres">Sphères</button>
+      <button type="button" role="tab" id="t-journal" data-o="journal" aria-controls="p-journal">Journal</button>
+    </div>
+    <div id="p-politiques" role="tabpanel" aria-labelledby="t-politiques" tabindex="0"></div>
+    <div id="p-regions" role="tabpanel" aria-labelledby="t-regions" tabindex="0" hidden></div>
+    <div id="p-ressources" role="tabpanel" aria-labelledby="t-ressources" tabindex="0" hidden></div>
+    <div id="p-spheres" role="tabpanel" aria-labelledby="t-spheres" tabindex="0" hidden></div>
+    <div id="p-journal" role="tabpanel" aria-labelledby="t-journal" tabindex="0" hidden></div>
+  </section>
+</main>
+
+<div class="pied-mobile">
+  <button type="button" class="lien-aide">Règles</button>
+  <button type="button" class="avancer">Avancer</button>
+</div>
+
+<dialog id="d-intro" aria-labelledby="intro-titre">
+  <div class="dlg">
+    <h2 id="intro-titre">Atterrir</h2>
+    <p class="accroche">2025. Sept des neuf limites planétaires sont déjà franchies, le climat s’est réchauffé d’environ 1,4 °C et l’économie mondiale double tous les 25 ans environ. Vous avez 75 ans pour faire entrer le monde dans le donut.</p>
+    <ul class="regles">
+      <li>Le donut est votre tableau de bord. L’anneau vert est l’espace sûr et juste : au-delà, les limites planétaires sont dépassées ; en dessous, des besoins humains ne sont pas couverts.</li>
+      <li>Chaque tour dure 5 ans. Répartissez votre capital politique entre neuf politiques, puis avancez. Une politique ne peut monter que d’un niveau par tour.</li>
+      <li>Tout est relié : une solution peut créer un problème ailleurs. Les points de bascule sont cachés et leurs seuils sont incertains.</li>
+    </ul>
+    <p class="graine">Prototype : les chiffres de départ sont des ordres de grandeur arrondis et le modèle est volontairement simplifié.</p>
+    <div class="actions" id="intro-actions"></div>
+  </div>
+</dialog>
+
+<dialog id="d-recap" aria-labelledby="recap-titre">
+  <div class="dlg">
+    <h2 id="recap-titre"></h2>
+    <div id="recap-corps"></div>
+    <div class="actions"><button type="button" class="avancer-principal" id="recap-ok">Continuer</button></div>
+  </div>
+</dialog>
+
+<dialog id="d-fin" aria-labelledby="fin-titre">
+  <div class="dlg">
+    <h2 id="fin-titre"></h2>
+    <div id="fin-corps"></div>
+    <div class="actions">
+      <button type="button" class="avancer-principal" id="fin-rejouer">Nouvelle partie</button>
+      <button type="button" class="secondaire" id="fin-meme">Rejouer la même partie</button>
+      <button type="button" class="secondaire" id="fin-fermer">Revoir ma partie</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+// =====================================================================
+//  ATTERRIR — moteur de simulation (aucune dépendance au DOM)
+//  Ordres de grandeur arrondis (~2024), à remplacer par des séries sourcées
+//  (Our World in Data, Global Carbon Budget, USGS, FAO, PIK…).
+// =====================================================================
+const Atterrir = (() => {
+  'use strict';
+
+  const ANNEE_DEBUT = 2025, ANNEE_FIN = 2100, PAS = 5;
+  const COUTS = [0, 1, 2, 4];               // coût cumulé d'un levier selon son niveau
+  const SEUIL_RICHE = 30000;                // $ PPA / hab.
+
+  // --- Régions (découpage « continents » d'Our World in Data) ----------
+  // pop : millions ; y : PIB/hab ($ PPA) ; gpc : énergie primaire (GJ/hab)
+  // co2 : Gt CO2 fossile/an ; s : part bas-carbone de l'énergie ; hist : part du cumul historique
+  const REGIONS = [
+    { id: 'nam', nom: 'Amérique du Nord', pop: 610, y: 48000, gpc: 195, co2: 6.1, s: 0.20, hist: 0.27, S0: 58,
+      gP0: 0.006, gPf: -0.001, kP: 0.03, gY0: 0.016, gYf: 0.010, vuln: 0.8, cote: 0.8 },
+    { id: 'sam', nom: 'Amérique du Sud', pop: 440, y: 16000, gpc: 60, co2: 1.1, s: 0.33, hist: 0.03, S0: 50,
+      gP0: 0.006, gPf: -0.006, kP: 0.03, gY0: 0.022, gYf: 0.012, vuln: 1.2, cote: 0.8 },
+    { id: 'eur', nom: 'Europe (avec la Russie)', court: 'Europe', pop: 745, y: 38000, gpc: 135, co2: 4.9, s: 0.28, hist: 0.31, S0: 60,
+      gP0: -0.001, gPf: -0.004, kP: 0.03, gY0: 0.013, gYf: 0.009, vuln: 0.7, cote: 0.7 },
+    { id: 'afr', nom: 'Afrique', pop: 1500, y: 5500, gpc: 16, co2: 1.45, s: 0.10, hist: 0.03, S0: 46,
+      gP0: 0.023, gPf: -0.002, kP: 0.018, gY0: 0.032, gYf: 0.015, vuln: 1.8, cote: 1.0 },
+    { id: 'asi', nom: 'Asie', pop: 4800, y: 17000, gpc: 70, co2: 22.3, s: 0.15, hist: 0.33, S0: 62,
+      gP0: 0.006, gPf: -0.005, kP: 0.03, gY0: 0.030, gYf: 0.010, vuln: 1.3, cote: 1.5 },
+    { id: 'oce', nom: 'Océanie', pop: 46, y: 42000, gpc: 180, co2: 0.45, s: 0.15, hist: 0.013, S0: 64,
+      gP0: 0.011, gPf: 0.001, kP: 0.03, gY0: 0.015, gYf: 0.010, vuln: 1.0, cote: 1.0 },
+  ];
+  const PARAM = Object.fromEntries(REGIONS.map(r => [r.id, r]));
+
+  // --- Leviers politiques ------------------------------------------------
+  const LEVIERS = [
+    { id: 'bascarbone', nom: 'Énergies bas-carbone', sphere: 'atmo',
+      effet: 'Remplace le fossile par du solaire, de l’éolien, de l’hydraulique et du nucléaire.',
+      revers: 'Consomme des métaux. Moins efficace en Afrique sans financements.' },
+    { id: 'efficacite', nom: 'Efficacité énergétique', sphere: 'atmo',
+      effet: 'Produit autant avec moins d’énergie : isolation, moteurs, procédés.',
+      revers: 'Effet rebond : une partie des économies est reconsommée.' },
+    { id: 'sobriete', nom: 'Sobriété des pays riches', sphere: 'anthropo',
+      effet: 'Ralentit la consommation des régions au-dessus de 30 000 $/hab. et limite l’effet rebond.',
+      revers: 'Moins de croissance : la stabilité sociale baisse sans protection sociale.' },
+    { id: 'protection', nom: 'Protection sociale', sphere: 'anthropo',
+      effet: 'Rend les sociétés moins dépendantes de la croissance pour rester stables.',
+      revers: 'Ne réduit aucune pression écologique à elle seule.' },
+    { id: 'forets', nom: 'Forêts et aires protégées', sphere: 'bio',
+      effet: 'Freine la déforestation, puis reboise (niveau 2 et plus).',
+      revers: 'Moins de terres agricoles : pression sur l’alimentation.' },
+    { id: 'agro', nom: 'Agroécologie et alimentation', sphere: 'bio',
+      effet: 'Moins d’engrais et de viande, sols plus résistants aux sécheresses.',
+      revers: 'Rendements un peu plus faibles.' },
+    { id: 'peche', nom: 'Pêche durable', sphere: 'hydro',
+      effet: 'Quotas de pêche, puis réserves marines au niveau 3.',
+      revers: 'Moins de prises à court terme.' },
+    { id: 'circulaire', nom: 'Économie circulaire', sphere: 'litho',
+      effet: 'Recyclage, réparation, réemploi : moins de métaux extraits et moins de pollutions.',
+      revers: 'Effet lent, à anticiper.' },
+    { id: 'solidarite', nom: 'Solidarité et adaptation', sphere: 'anthropo',
+      effet: 'Finance l’adaptation et la transition des régions vulnérables.',
+      revers: 'Un peu moins de croissance et de stabilité dans les régions riches.' },
+  ];
+
+  // --- Points de bascule (plages d'après Armstrong McKay et al., 2022) -----
+  const BASCULES = [
+    { id: 'coraux', nom: 'Récifs coralliens tropicaux', sphere: 'hydro', lo: 1.0, mode: 1.5, hi: 2.0,
+      effet: 'Les récifs tropicaux dépérissent : moins de poissons, biodiversité en chute.' },
+    { id: 'pergelisol', nom: 'Pergélisol', sphere: 'cryo', lo: 1.0, mode: 1.5, hi: 2.3,
+      effet: 'Le sol gelé de l’Arctique dégèle brutalement et relâche du carbone : +1,5 Gt de CO₂ par an.' },
+    { id: 'groenland', nom: 'Calotte du Groenland', sphere: 'cryo', lo: 0.8, mode: 1.5, hi: 3.0,
+      effet: 'La fonte devient irréversible : la mer monte plus vite, et continuera pendant des siècles.' },
+    { id: 'antarctique', nom: 'Antarctique de l’Ouest', sphere: 'cryo', lo: 1.0, mode: 1.5, hi: 3.0,
+      effet: 'Les glaciers s’effondrent dans l’océan : la hausse du niveau de la mer s’accélère.' },
+    { id: 'amazonie', nom: 'Forêt amazonienne', sphere: 'bio', lo: 2.0, mode: 3.5, hi: 6.0, foret: 54,
+      effet: 'La forêt se transforme en savane : elle relâche son carbone au lieu d’en absorber.' },
+    { id: 'amoc', nom: 'Circulation atlantique (AMOC)', sphere: 'hydro', lo: 1.4, mode: 4.0, hi: 8.0,
+      effet: 'Le grand courant atlantique s’effondre : hivers rudes en Europe, moussons perturbées.' },
+    { id: 'boreale', nom: 'Forêt boréale', sphere: 'bio', lo: 1.4, mode: 4.0, hi: 5.0,
+      effet: 'Les forêts du Grand Nord dépérissent et brûlent : +1 Gt de CO₂ par an.' },
+  ];
+
+  // --- Limites planétaires : ratio = 1 à la limite, hr = début de la zone à haut risque
+  const LIMITES = [
+    { id: 'climat', nom: 'Changement climatique', court: 'Climat', hr: (450 - 280) / 70,
+      ratio: g => (g.ppm - 280) / 70, val: g => `${Math.round(g.ppm)} ppm de CO₂`, seuil: 'limite : 350 ppm' },
+    { id: 'biosphere', nom: 'Intégrité de la biosphère', court: 'Biosphère', hr: 2,
+      ratio: g => (100 - g.bii) / 10, val: g => `${fr(g.bii, 1)} % d’intégrité`, seuil: 'limite : 90 %' },
+    { id: 'sols', nom: 'Usage des sols', court: 'Forêts', hr: 46 / 25,
+      ratio: g => (100 - g.foret) / 25, val: g => `${fr(g.foret, 1)} % du couvert forestier d’origine`, seuil: 'limite : 75 %' },
+    { id: 'eau', nom: 'Eau douce', court: 'Eau douce', hr: 2,
+      ratio: g => g.eau, val: g => `indice ${fr(g.eau, 2)}`, seuil: 'limite : 1' },
+    { id: 'azote', nom: 'Azote et phosphore', court: 'Engrais', hr: 200 / 62,
+      ratio: g => g.azote / 62, val: g => `${Math.round(g.azote)} Mt d’azote par an`, seuil: 'limite : 62 Mt' },
+    { id: 'acid', nom: 'Acidification des océans', court: 'Acidité', hr: 2,
+      ratio: g => (3.44 - g.omega) / 0.69, val: g => `Ω aragonite ${fr(g.omega, 2)}`, seuil: 'limite : 2,75' },
+    { id: 'nouvelles', nom: 'Entités nouvelles', court: 'Pollutions', hr: 2.5,
+      ratio: g => g.nouvelles, val: g => `indice ${fr(g.nouvelles, 2)} (plastiques, chimie)`, seuil: 'limite : 1' },
+    { id: 'aerosols', nom: 'Aérosols atmosphériques', court: 'Aérosols', hr: 2,
+      ratio: g => g.aerosols, val: g => `indice ${fr(g.aerosols, 2)}`, seuil: 'limite : 1' },
+    { id: 'ozone', nom: 'Couche d’ozone', court: 'Ozone', hr: 2,
+      ratio: g => g.ozone, val: g => `indice ${fr(g.ozone, 2)} (en reconstitution)`, seuil: 'limite : 1' },
+  ];
+
+  // --- Plancher social -------------------------------------------------------
+  const PLANCHERS = [
+    { id: 'revenu', court: 'Revenu', nom: 'Revenu', val: r => r.yEff / 12000, seuil: '12 000 $/hab.' },
+    { id: 'alim', court: 'Alimentation', nom: 'Alimentation', val: r => r.food, seuil: 'indice 1' },
+    { id: 'energie', court: 'Énergie', nom: 'Accès à l’énergie', val: r => servicesEnergie(r) / 30, seuil: '30 GJ/hab.' },
+    { id: 'stab', court: 'Stabilité', nom: 'Stabilité sociale', val: r => r.S / 45, seuil: '45/100' },
+  ];
+
+  // Scénarios du GIEC (AR6, valeurs centrales approximatives, °C vs 1850-1900)
+  const SSP = [
+    { id: 'SSP1-1.9', pts: [[2025, 1.35], [2030, 1.5], [2050, 1.6], [2090, 1.4]] },
+    { id: 'SSP1-2.6', pts: [[2025, 1.35], [2030, 1.5], [2050, 1.7], [2090, 1.8]] },
+    { id: 'SSP2-4.5', pts: [[2025, 1.35], [2030, 1.5], [2050, 2.0], [2090, 2.7]] },
+    { id: 'SSP3-7.0', pts: [[2025, 1.35], [2030, 1.5], [2050, 2.1], [2090, 3.6]] },
+    { id: 'SSP5-8.5', pts: [[2025, 1.35], [2030, 1.5], [2050, 2.4], [2090, 4.4]] },
+  ];
+
+  // --- Utilitaires -------------------------------------------------------------
+  function fr(x, d = 0) {
+    return Number(x).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  function alea(st) {                       // mulberry32, état sérialisable
+    st.rng = (st.rng + 0x6D2B79F5) >>> 0;
+    let t = st.rng;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function triangulaire(st, a, c, b) {
+    const u = alea(st), f = (c - a) / (b - a);
+    return u < f ? a + Math.sqrt(u * (b - a) * (c - a)) : b - Math.sqrt((1 - u) * (b - a) * (b - c));
+  }
+  function energieParHab(r) { return r.E / r.pop * 1000; }    // GJ/hab.
+  // Services énergétiques : énergie par habitant exprimée à l'efficacité de 2025
+  function servicesEnergie(r) { return energieParHab(r) * (r.ei0 || r.ei) / r.ei; }
+  function coutLevier(n) { return COUTS[n]; }
+  function coutTotal(lev) { return Object.values(lev).reduce((a, n) => a + COUTS[n], 0); }
+  const bascule = (st, id) => st.bascules.find(b => b.id === id).active;
+  const popTotale = st => st.regions.reduce((a, r) => a + r.pop, 0);
+  function stabiliteMoyenne(st) {
+    return st.regions.reduce((a, r) => a + r.S * r.pop, 0) / popTotale(st);
+  }
+
+  // --- Nouvelle partie -------------------------------------------------------
+  function nouvellePartie(seed) {
+    seed = (seed >>> 0) || 1;
+    const st = {
+      version: 1, seed, rng: seed, year: ANNEE_DEBUT, tour: 0, fini: false,
+      leviers: {}, leviersPrec: {}, journal: [], hist: [], flags: {}, regions: [], bascules: [], g: {},
+    };
+    for (const l of LEVIERS) { st.leviers[l.id] = 0; st.leviersPrec[l.id] = 0; }
+    for (const b of BASCULES) {
+      st.bascules.push({ id: b.id, seuil: triangulaire(st, b.lo, b.mode, b.hi), active: false, annee: null });
+    }
+    const g = st.g;
+    Object.assign(g, {
+      cum: 2650, T: 1.37, nonCO2: 0.18, mer: 0.23, ppm: 0, omega: 0,
+      petrole0: 10200, petrole: 10200, eroi: 18, prodPetrole: 0, penuriePetrole: 0,
+      metaux0: 150, metaux: 150, demMetaux: 1, penurieMetaux: 0,
+      poissons: 420, K: 1000, effortBAU: 0.214, prises: 90,
+      foret: 60, bii: 76, azote: 205, eau: 1.44, nouvelles: 1.5, aerosols: 0.7, ozone: 0.55,
+      rendement: 1, luc: 4.0, chocPIB: 0, chocAlim: 0, bonusTech: 0, bonusCapital: 0, co2Evt: 0,
+      rebond: 0.45, banquise: 0.5, tauxMer: 3.6, phi: 1.12,
+    });
+    let totE = 0, totFoss = 0, LC = 0, gdp = 0, co2 = 0;
+    for (const d of REGIONS) {
+      const E = d.pop * d.gpc / 1000;                               // EJ
+      const r = {
+        id: d.id, nom: d.nom, court: d.court || d.nom, pop: d.pop, gP: d.gP0, s: d.s, S: d.S0,
+        food: 1, crise: false, nbCrises: 0, cumCO2: d.hist * 1800, dmgEvt: 0,
+        ei: E / (d.pop * d.y), ei0: E / (d.pop * d.y), fc: d.co2 / (E * (1 - d.s)), E, co2: d.co2, yEff: d.y, gEff: d.gY0,
+      };
+      const dmg0 = d.vuln * 0.012 * Math.max(0, g.T - 0.8) ** 2;
+      r.dmg = dmg0; r.yPot = d.y / (1 - dmg0);
+      st.regions.push(r);
+      totE += E; totFoss += E * (1 - d.s); LC += E * d.s; gdp += d.pop * d.y; co2 += d.co2;
+    }
+    g.foss0 = totFoss; g.pib0 = gdp; g.LCprec = LC; g.ajoutLC0 = 4.5;
+    g.emissions = co2 * 1.033 + g.luc; g.prodPetrole = totFoss * 0.38;
+    g.prod0 = 1 - 0.06 * Math.pow(Math.max(0, g.T - 1.2), 1.4);
+    g.prod = g.prod0;
+    let dem = 0;
+    for (const r of st.regions) { r.regime = 0.85 + 0.1 * Math.log(r.yEff / 5000 + 1); dem += r.pop * r.regime; }
+    g.demNorm = g.prod0 / (dem * 1.12);
+    g.phi = 1.12;
+    for (const r of st.regions) r.food = g.phi * acces(r, st.leviers);
+    derive(st);
+    st.budget = calculerBudget(st);
+    st.hist.push(instantane(st));
+    journaliser(st, 'debut', 'Le monde en 2025',
+      'Sept des neuf limites planétaires sont déjà franchies. Le climat s’est réchauffé d’environ 1,4 °C. La population et l’économie continuent de croître.',
+      'Vous avez 75 ans pour faire entrer le monde dans le donut : sous le plafond écologique, au-dessus du plancher social.', null);
+    return st;
+  }
+
+  function acces(r, L) {
+    return clamp(0.78 + 0.075 * Math.log(r.yEff / 2000), 0.55, 1.1) + (r.yEff < SEUIL_RICHE ? 0.02 * L.solidarite : 0);
+  }
+
+  function derive(st) {
+    const g = st.g;
+    g.ppm = 280 + 0.435 * g.cum / 7.81;
+    g.omega = 3.44 - 0.0048 * (g.ppm - 280);
+    g.acid = (3.44 - g.omega) / 0.69;
+    g.banquise = clamp(1 - (g.T - 0.6) / 1.5, 0, 1);
+  }
+
+  // --- Une année de simulation ---------------------------------------------
+  function stepAnnee(st) {
+    const L = st.leviers, g = st.g, t = st.year - ANNEE_DEBUT;
+    const rebond = Math.max(0, 0.45 - 0.12 * L.sobriete);
+    g.rebond = rebond;
+    let totE = 0, totFoss = 0, co2Reg = 0, LC = 0, gdp = 0;
+
+    for (const r of st.regions) {
+      const P = PARAM[r.id];
+      const riche = r.yEff > SEUIL_RICHE;
+      const fc = r.crise ? 0.5 : 1;
+      // Démographie : transition plus rapide avec l'éducation et la solidarité
+      const kP = P.kP * (1 + (riche ? 0 : 0.15 * L.solidarite));
+      r.gP += kP * (P.gPf - r.gP);
+      let gP = r.gP;
+      if (r.food < 0.92) gP -= 0.03 * (0.92 - r.food);
+      if (r.crise) gP -= 0.003;
+      r.pop *= 1 + gP;
+      // Croissance économique potentielle
+      let gY = P.gYf + (P.gY0 - P.gYf) * Math.exp(-0.02 * t);
+      if (riche) gY -= 0.006 * L.sobriete * fc;
+      gY += riche ? -0.001 * L.solidarite : 0.002 * L.solidarite;
+      gY += 0.004 * L.efficacite * rebond;
+      if (r.crise) gY = -0.03;
+      gY -= g.chocPIB;
+      r.yPot *= 1 + gY;
+      // Intensité énergétique
+      r.ei *= 1 - (0.011 + 0.005 * L.efficacite * fc * (1 - rebond));
+      // Énergies bas-carbone
+      const eff = riche ? 1.15 : (r.id === 'afr' ? 0.55 + 0.2 * L.solidarite : 0.9 + 0.05 * L.solidarite);
+      let ds = 0.0045 + g.bonusTech + 0.007 * L.bascarbone * fc * eff;
+      ds *= 1 - g.penurieMetaux;
+      r.s = Math.min(0.97, r.s + ds);
+      r.fc *= 0.997;
+      // Dommages climatiques et hausse des mers
+      const adapt = clamp((riche ? 0.08 : 0.02) + 0.1 * L.solidarite * (riche ? 0.5 : 1.3), 0, 0.6);
+      const dClim = P.vuln * 0.012 * Math.max(0, g.T - 0.8) ** 2;
+      const dMer = 0.03 * Math.max(0, g.mer - 0.25) * P.cote;
+      r.dmg = Math.min(0.5, (dClim + dMer) * (1 - adapt) + r.dmgEvt);
+      const penEnergie = 0.9 * g.penuriePetrole + 0.15 * g.penurieMetaux;
+      const prec = r.yEff;
+      r.yEff = r.yPot * (1 - r.dmg) * (1 - penEnergie);
+      r.gEff = r.yEff / prec - 1;
+      // Identité de Kaya : CO2 = pop × PIB/hab × énergie/PIB × CO2/énergie
+      r.E = r.pop * r.yEff * r.ei;
+      const foss = r.E * (1 - r.s);
+      r.co2 = foss * r.fc;
+      r.cumCO2 += r.co2;
+      totE += r.E; totFoss += foss; co2Reg += r.co2; LC += r.E * r.s; gdp += r.pop * r.yEff;
+    }
+
+    // Pétrole : le coût énergétique d'extraction monte quand le stock baisse
+    const demPetrole = totFoss * 0.38;
+    g.eroi = 3 + 15 * Math.pow(Math.max(0, g.petrole) / g.petrole0, 1.2);
+    const plafond = g.petrole / 18;
+    const offre = Math.min(demPetrole, plafond);
+    const manque = demPetrole - offre;
+    const perteNette = offre * Math.max(0, 1 / g.eroi - 1 / 18);
+    const charbon = 0.4 * manque;                                   // substitution par le charbon
+    g.penuriePetrole = Math.max(0, (manque - charbon + perteNette) / totE);
+    g.petrole -= offre; g.prodPetrole = offre;
+    if (!st.flags.pic && manque > 0.02 * demPetrole) {
+      st.flags.pic = st.year;
+      journaliser(st, 'ressource', 'Pic pétrolier',
+        'La production mondiale de pétrole ne suit plus la demande. Une partie du manque est comblée par du charbon liquéfié, encore plus émetteur.',
+        'Une ressource finie ne s’arrête pas net : elle devient de plus en plus coûteuse à extraire, en argent et en énergie.', 'Mécanisme bien établi, date débattue');
+    }
+
+    // Métaux : croissance économique + construction des infrastructures bas-carbone
+    const ajoutLC = Math.max(0, LC - g.LCprec); g.LCprec = LC;
+    const circ = 1 - 0.15 * L.circulaire;
+    const demMet = (0.8 * Math.pow(gdp / g.pib0, 0.8) * Math.exp(-0.005 * t) + 0.2 * ajoutLC / g.ajoutLC0) * circ;
+    const offreM = Math.min(demMet, g.metaux / 22);
+    g.penurieMetaux = demMet > 0 ? 1 - offreM / demMet : 0;
+    g.metaux -= offreM; g.demMetaux = demMet;
+    if (!st.flags.metaux && g.penurieMetaux > 0.03) {
+      st.flags.metaux = st.year;
+      journaliser(st, 'ressource', 'Pénurie de métaux',
+        'Cuivre, nickel, lithium : les mines ne suivent plus. Les chantiers d’éoliennes et de réseaux électriques ralentissent.',
+        'La transition énergétique est aussi une transition matérielle : les limites se déplacent d’une sphère à l’autre.', 'Mécanisme établi, ampleur débattue');
+    }
+
+    // Pêches : croissance logistique, effondrement sous 20 % de la capacité
+    g.K = 1000 * (1 - 0.12 * Math.max(0, g.T - 1.2)) * (bascule(st, 'coraux') ? 0.88 : 1) * (1 - 0.08 * Math.max(0, g.acid - 1));
+    const rP = 0.36 * (L.peche === 3 ? 1.1 : 1);
+    const quota = [Infinity, 0.2, 0.17, 0.14][L.peche];
+    const F = Math.min(g.effortBAU, quota);
+    if (g.effortBAU > quota) g.effortBAU += 0.04 * (quota - g.effortBAU);   // la flotte se réduit sous quota
+    else g.effortBAU *= 1.015;
+    const B = g.poissons;
+    const croissance = rP * B * (1 - B / g.K) * Math.min(1, B / (0.2 * g.K));
+    g.prises = F * B;
+    g.poissons = Math.max(1, B + croissance - g.prises);
+    if (!st.flags.peche && g.poissons < 0.2 * g.K) {
+      st.flags.peche = st.year;
+      journaliser(st, 'ressource', 'Effondrement des pêcheries',
+        'Les grands stocks de poissons s’effondrent les uns après les autres. Les flottes restent à quai.',
+        'Comme la morue de Terre-Neuve en 1992 : un stock surexploité peut s’effondrer brutalement et mettre des décennies à revenir.', 'Fait observé');
+      for (const r of st.regions) r.S -= 3;
+    }
+
+    // Alimentation
+    g.rendement *= 1 + (0.002 + 0.005 * Math.exp(-0.02 * t));
+    const climF = 1 - 0.06 * Math.pow(Math.max(0, g.T - 1.2), 1.4) * (1 - 0.15 * L.agro);
+    const solF = 1 + 0.6 * (60 - g.foret) / 100;
+    const eauF = 1 - 0.12 * Math.max(0, g.eau - 1.6);
+    const pecheF = 1 - 0.05 * (1 - Math.min(1, g.prises / 90));
+    const amocF = bascule(st, 'amoc') ? 0.94 : 1;
+    g.prod = g.rendement * climF * solF * eauF * pecheF * (1 - 0.02 * L.agro) * amocF * (1 - g.chocAlim);
+    let dem = 0;
+    for (const r of st.regions) {
+      r.regime = (0.85 + 0.1 * Math.log(r.yEff / 5000 + 1)) * (1 - 0.04 * L.agro);
+      dem += r.pop * r.regime;
+    }
+    g.phi = g.prod / (dem * g.demNorm);
+    for (const r of st.regions) r.food = g.phi * acces(r, L);
+
+    // Forêts et usage des sols
+    let defor = 0.13 * (1 - 0.3 * L.forets);
+    if (g.phi < 1.05) defor *= 1 + 3 * (1.05 - g.phi);
+    const refor = 0.03 * Math.max(0, L.forets - 1) + 0.02 * L.agro;
+    g.foret += -defor + refor - (bascule(st, 'amazonie') ? 0.1 : 0) - (bascule(st, 'boreale') ? 0.04 : 0);
+    g.luc = 4.0 * defor / 0.13 - 15 * refor + (bascule(st, 'amazonie') ? 1.5 : 0);
+
+    // Émissions totales et climat (réchauffement ∝ émissions cumulées)
+    const retro = (bascule(st, 'pergelisol') ? 1.5 : 0) + (bascule(st, 'boreale') ? 1.0 : 0);
+    g.emissions = co2Reg * 1.033 + charbon * 0.1 + g.luc + retro + g.co2Evt;
+    g.co2Evt = 0;
+    g.cum += g.emissions;
+    const agriF = g.prod / g.prod0 * (1 - 0.06 * L.agro);
+    const fossF = totFoss / g.foss0;
+    g.nonCO2 = 0.22 * agriF + 0.13 * fossF - 0.17 * fossF;   // méthane, protoxyde d'azote, aérosols (refroidissants)
+    g.T += (0.00045 * g.cum + g.nonCO2 - g.T) * 0.35;
+    const tauxMer = 1.8 + 3.2 * Math.max(0, g.T - 0.85) + (bascule(st, 'groenland') ? 1.2 : 0) + (bascule(st, 'antarctique') ? 1.5 : 0);
+    g.mer += tauxMer / 1000; g.tauxMer = tauxMer;
+    derive(st);
+
+    // Autres limites
+    g.azote += 0.2 * (205 * (g.prod / g.prod0) * (1 - 0.18 * L.agro) - g.azote);
+    g.eau = 1.0 + 0.35 * (g.prod / g.prod0) + 0.25 * Math.max(0, g.T - 1.0) - 0.08 * L.agro;
+    g.nouvelles += 0.1 * (1.5 * Math.pow(gdp / g.pib0, 0.5) * (1 - 0.12 * L.circulaire) - g.nouvelles);
+    g.aerosols = 0.7 * fossF;
+    g.ozone = Math.max(0.35, g.ozone - 0.003);
+    g.bii += -0.05 - 0.15 * (defor - refor) - 0.04 * Math.max(0, g.T - 1.2) - 0.03 * Math.max(0, g.nouvelles - 1.5)
+      + 0.03 * L.forets + 0.01 * L.agro;
+    g.bii = clamp(g.bii, 20, 100);
+
+    // Stabilité sociale
+    const sens = Math.max(0.3, 1 - 0.22 * L.protection);
+    for (const r of st.regions) {
+      let dS = 0.06 * (62 - r.S);
+      if (!r.crise) dS += 120 * (r.gEff - 0.015) * sens;
+      if (r.food < 1) dS += 40 * (r.food - 1);
+      dS += r.yEff > SEUIL_RICHE ? -0.25 * L.solidarite : 0.4 * L.solidarite;
+      dS -= 30 * g.penuriePetrole + 5 * g.penurieMetaux;
+      r.S = clamp(r.S + dS, 0, 100);
+      if (!r.crise && r.S < 20) {
+        r.crise = true; r.nbCrises++;
+        journaliser(st, 'crise', `${r.court} entre en crise`,
+          'Pénuries, chômage, défiance : les institutions ne parviennent plus à répondre. L’économie recule de 3 % par an et vos politiques y sont deux fois moins efficaces.',
+          'Un effondrement réduit les émissions… au prix de souffrances immenses. Ce n’est pas une stratégie.', null, r.id);
+      } else if (r.crise && r.S > 38) {
+        r.crise = false;
+        journaliser(st, 'sortie', `${r.court} sort de la crise`,
+          'La société se réorganise et retrouve un peu de stabilité.', null, null, r.id);
+      }
+    }
+    st.hist.push(instantane(st));
+  }
+
+  function verifierBascules(st) {
+    const g = st.g;
+    for (const b of st.bascules) {
+      if (b.active) continue;
+      const def = BASCULES.find(x => x.id === b.id);
+      const depasse = g.T >= b.seuil || (def.foret && g.foret < def.foret);
+      if (depasse && alea(st) < 0.3) {
+        b.active = true; b.annee = st.year;
+        if (b.id === 'coraux') g.bii -= 2;
+        if (b.id === 'amazonie') { g.bii -= 3; st.regions.find(r => r.id === 'sam').S -= 10; }
+        if (b.id === 'boreale') g.bii -= 1;
+        if (b.id === 'amoc') { for (const r of st.regions) if (r.id === 'eur' || r.id === 'afr') r.S -= 8; }
+        journaliser(st, 'bascule', `Point de bascule franchi : ${def.nom}`, def.effet,
+          'Une fois franchi, un point de bascule s’entretient tout seul : réduire les émissions ne suffit plus à revenir en arrière.',
+          'Seuils incertains (Armstrong McKay et al., 2022)');
+      }
+    }
+  }
+
+  // --- Événements --------------------------------------------------------
+  function choisirRegion(st, poids) {
+    const tot = st.regions.reduce((a, r) => a + poids(r), 0);
+    let u = alea(st) * tot;
+    for (const r of st.regions) { u -= poids(r); if (u <= 0) return r; }
+    return st.regions[st.regions.length - 1];
+  }
+
+  const EVENEMENTS = [
+    { id: 'canicule', poids: st => Math.max(0, (st.g.T - 1) * 2.2),
+      jouer(st) {
+        const r = choisirRegion(st, x => PARAM[x.id].vuln * Math.sqrt(x.pop));
+        r.S -= 7; st.g.chocAlim += 0.02;
+        return [`Canicule historique : ${r.court}`, 'Récoltes perdues, hôpitaux saturés, centrales électriques à l’arrêt faute d’eau de refroidissement.',
+          'Chaque dixième de degré supplémentaire rend les vagues de chaleur extrêmes plus fréquentes et plus intenses.', 'Confiance très élevée (GIEC)', r.id];
+      } },
+    { id: 'secheresse', poids: st => Math.max(0, (st.g.T - 1.1) * 1.6),
+      jouer(st) {
+        st.g.chocAlim += 0.06;
+        for (const r of st.regions) if (r.id === 'afr' || r.id === 'asi') r.S -= 3;
+        return ['Sécheresses simultanées', 'Plusieurs greniers à blé du monde manquent d’eau la même année. Les prix alimentaires flambent.',
+          'Quand plusieurs grandes régions agricoles sont touchées en même temps, les stocks mondiaux ne suffisent plus à amortir le choc.', 'Confiance moyenne (GIEC)', null];
+      } },
+    { id: 'inondation', poids: st => Math.max(0, (st.g.T - 1) * 1.5),
+      jouer(st) {
+        const r = choisirRegion(st, x => PARAM[x.id].cote * Math.sqrt(x.pop));
+        r.S -= 5; r.dmgEvt += 0.02;
+        return [`Inondations : ${r.court}`, 'Des pluies diluviennes et une mer plus haute submergent villes côtières et vallées.',
+          'Un air plus chaud contient plus de vapeur d’eau, environ 7 % de plus par degré : les pluies extrêmes s’intensifient.', 'Confiance élevée (GIEC)', r.id];
+      } },
+    { id: 'feux', poids: st => Math.max(0, (st.g.T - 1) * 1.2),
+      jouer(st) {
+        st.g.foret -= 0.4; st.g.bii -= 0.3; st.g.co2Evt += 1.5;
+        return ['Mégafeux', 'Des millions d’hectares de forêt brûlent en zone boréale et méditerranéenne.',
+          'Les forêts qui brûlent relâchent leur carbone : une rétroaction qui amplifie le réchauffement.', 'Confiance élevée (GIEC)', null];
+      } },
+    { id: 'techno', poids: () => 1.0,
+      jouer(st) {
+        st.g.bonusTech += 0.0012;
+        return ['Percée technologique', 'Le prix des panneaux solaires et des batteries chute encore.',
+          'Une technologie moins chère accélère la transition, mais ne réduit pas à elle seule la consommation d’énergie.', 'Tendance observée', null];
+      } },
+    { id: 'gisement', poids: () => 0.6,
+      jouer(st) {
+        st.g.petrole += 600;
+        return ['Nouveau gisement de pétrole', 'Un vaste gisement offshore est découvert : 100 milliards de barils.',
+          'Plus de réserves, c’est un répit pour l’économie et plus de CO₂ en puissance. Les réserves fossiles connues dépassent déjà de loin le budget carbone.', 'Fait établi', null];
+      } },
+    { id: 'krach', poids: () => 0.5,
+      jouer(st) {
+        st.g.chocPIB += 0.012;
+        for (const r of st.regions) r.S -= 5;
+        return ['Krach financier mondial', 'Les marchés s’effondrent, le crédit se tarit, le chômage monte partout.',
+          'Dans une économie mondialisée, un choc financier se propage en quelques semaines à tous les continents.', 'Fait observé (2008)', null];
+      } },
+    { id: 'pandemie', poids: st => 0.3 + Math.max(0, 90 - st.g.bii) / 40,
+      jouer(st) {
+        st.g.chocPIB += 0.008;
+        for (const r of st.regions) r.S -= 6;
+        return ['Pandémie', 'Un nouveau virus passé de l’animal à l’humain se propage dans le monde entier.',
+          'La destruction des habitats multiplie les contacts entre faune sauvage, élevage et humains.', 'Confiance moyenne (IPBES)', null];
+      } },
+    { id: 'cop', poids: st => 0.4 + stabiliteMoyenne(st) / 100,
+      jouer(st) {
+        st.g.bonusCapital += 2;
+        return ['Accord international ambitieux', 'Une COP aboutit à des engagements chiffrés et vérifiables.',
+          'La coopération augmente ce que chaque pays est prêt à faire : +2 de capital politique pour ces 5 ans.', 'Règle du jeu', null];
+      } },
+    { id: 'conflit', poids: st => (st.g.penuriePetrole + st.g.penurieMetaux) * 20,
+      jouer(st) {
+        const a = choisirRegion(st, x => PARAM[x.id].vuln), b = choisirRegion(st, x => x.pop);
+        a.S -= 8; b.S -= 5;
+        return ['Conflits pour les ressources', `Des tensions armées éclatent autour de gisements et de routes d’approvisionnement (${a.court}, ${b.court}).`,
+          'La rareté des ressources aggrave les tensions, surtout là où les institutions sont fragiles.', 'Confiance moyenne', a.id];
+      } },
+    { id: 'migrations', poids: st => Math.max(0, st.g.T - 1.6) + 0.5 * st.regions.filter(r => r.crise).length,
+      jouer(st) {
+        for (const r of st.regions) r.S -= (r.yEff > SEUIL_RICHE ? 4 : 2);
+        return ['Déplacements de population', 'Des millions de personnes quittent des régions devenues trop chaudes, trop sèches ou submergées.',
+          'La plupart des déplacés climatiques restent dans leur pays ou leur région : les pays pauvres en accueillent le plus.', 'Confiance élevée (GIEC)', null];
+      } },
+    { id: 'entraide', poids: st => 0.4 + 0.3 * st.leviers.protection + 0.2 * st.leviers.solidarite,
+      jouer(st) {
+        const r = st.regions.reduce((a, x) => (x.S < a.S ? x : a));
+        r.S += 6;
+        return [`Réseaux d’entraide : ${r.court}`, 'Coopératives, circuits courts et associations de quartier se multiplient.',
+          'La résilience d’une société dépend aussi de sa cohésion et de sa capacité à s’organiser localement.', 'Observé', r.id];
+      } },
+  ];
+
+  function tirerEvenements(st) {
+    const n = alea(st) < 0.45 ? 2 : 1;
+    const deja = new Set();
+    for (let i = 0; i < n; i++) {
+      const prec = st.flags.derniers || [];
+      const dispo = EVENEMENTS.filter(e => !deja.has(e.id))
+        .map(e => [e, e.poids(st) * (prec.includes(e.id) ? 0.35 : 1)]).filter(([, w]) => w > 0);
+      const tot = dispo.reduce((a, [, w]) => a + w, 0);
+      let u = alea(st) * tot;
+      for (const [e, w] of dispo) {
+        u -= w;
+        if (u <= 0) {
+          deja.add(e.id);
+          const [titre, texte, lecon, conf, region] = e.jouer(st);
+          journaliser(st, 'evenement', titre, texte, lecon, conf, region);
+          break;
+        }
+      }
+    }
+    st.flags.derniers = [...deja];
+    for (const r of st.regions) r.S = clamp(r.S, 0, 100);
+  }
+
+  function journaliser(st, type, titre, texte, lecon, confiance, region = null) {
+    st.journal.push({ annee: st.year, type, titre, texte, lecon, confiance, region });
+  }
+
+  function calculerBudget(st) {
+    const crises = st.regions.filter(r => r.crise).length;
+    const b = Math.round(10 + (stabiliteMoyenne(st) - 55) / 7) + st.g.bonusCapital - 2 * crises;
+    return clamp(b, 3, 16);
+  }
+
+  function instantane(st) {
+    const g = st.g;
+    const pop = popTotale(st);
+    return {
+      a: st.year, T: g.T, em: g.emissions, pop, pib: st.regions.reduce((a, r) => a + r.pop * r.yEff, 0) / 1e6,
+      petrole: g.prodPetrole / 6, prises: g.prises, foret: g.foret, bii: g.bii, S: stabiliteMoyenne(st),
+      mer: g.mer, metaux: g.metaux, poissons: g.poissons, K: g.K, phi: g.phi,
+    };
+  }
+
+  // --- Tour de jeu ---------------------------------------------------------
+  function peutAugmenter(st, id) {
+    return st.leviers[id] < 3 && st.leviers[id] < st.leviersPrec[id] + 1;
+  }
+
+  function avancer(st) {
+    if (st.fini) return { erreur: 'La partie est terminée.' };
+    if (coutTotal(st.leviers) > st.budget) return { erreur: 'Vos politiques coûtent plus que votre capital politique.' };
+    const avant = st.journal.length;
+    st.g.bonusCapital = 0;
+    for (let i = 0; i < PAS; i++) {
+      st.year++;
+      stepAnnee(st);
+      verifierBascules(st);
+    }
+    st.g.chocPIB = 0; st.g.chocAlim = 0;
+    for (const r of st.regions) r.dmgEvt = 0;
+    st.tour++;
+    st.leviersPrec = { ...st.leviers };
+    if (st.year < ANNEE_FIN) tirerEvenements(st);
+    st.budget = calculerBudget(st);
+    if (st.year >= ANNEE_FIN) { st.fini = true; st.bilan = bilan(st); }
+    return { nouveaux: st.journal.slice(avant) };
+  }
+
+  // --- Indicateurs agrégés pour l'interface ----------------------------------
+  function manquesSociaux(st) {
+    const pop = popTotale(st);
+    return PLANCHERS.map(p => ({
+      ...p,
+      manque: st.regions.reduce((a, r) => a + r.pop * Math.max(0, 1 - p.val(r)), 0) / pop,
+    }));
+  }
+  function partSousPlancher(st) {
+    const pop = popTotale(st);
+    return st.regions.filter(r => PLANCHERS.some(p => p.val(r) < 0.97)).reduce((a, r) => a + r.pop, 0) / pop;
+  }
+  function budgetCarbone(st) {          // budget pour +2 °C, approximatif
+    const total = (2.0 - 0.2) / 0.00045 - 2650;
+    const utilise = st.g.cum - 2650;
+    return { total, utilise, part: utilise / total, anneesRestantes: (total - utilise) / Math.max(0.1, st.g.emissions) };
+  }
+  function croissanceMondiale(st) {
+    const h = st.hist;
+    if (h.length < 2) return 0.027;
+    const a = h[h.length - 1], b = h[Math.max(0, h.length - 6)];
+    return Math.pow(a.pib / b.pib, 1 / Math.max(1, a.a - b.a)) - 1;
+  }
+
+  function bilan(st) {
+    const g = st.g;
+    const franchies = LIMITES.filter(l => l.ratio(g) > 1).length;
+    const rouges = LIMITES.filter(l => l.ratio(g) > l.hr).length;
+    const crisesTotales = st.regions.reduce((a, r) => a + r.nbCrises, 0);
+    const enCrise = st.regions.filter(r => r.crise).length;
+    const sous = partSousPlancher(st);
+    const bascules = st.bascules.filter(b => b.active).length;
+    let issue;
+    if (g.T <= 2.0 && enCrise === 0 && crisesTotales <= 1 && sous <= 0.25 && rouges <= 3) issue = 'donut';
+    else if (g.T <= 2.6 && enCrise === 0 && crisesTotales <= 3 && sous <= 0.5) issue = 'descente';
+    else if (enCrise >= 3 || crisesTotales >= 6 || g.T >= 3.6) issue = 'effondrement';
+    else issue = 'declin';
+    const h90 = st.hist.find(h => h.a === 2090) || st.hist[st.hist.length - 1];
+    let ssp = SSP[0], ecart = Infinity;
+    for (const s of SSP) { const d = Math.abs(s.pts[3][1] - h90.T); if (d < ecart) { ecart = d; ssp = s; } }
+    return { issue, T: g.T, franchies, rouges, crisesTotales, enCrise, sous, bascules, ssp: ssp.id, mer: g.mer };
+  }
+
+  return {
+    ANNEE_DEBUT, ANNEE_FIN, PAS, COUTS, REGIONS, LEVIERS, BASCULES, LIMITES, PLANCHERS, SSP, SEUIL_RICHE,
+    nouvellePartie, avancer, coutTotal, coutLevier, peutAugmenter, manquesSociaux, partSousPlancher,
+    budgetCarbone, croissanceMondiale, energieParHab, stabiliteMoyenne, fr,
+  };
+})();
+if (typeof module !== 'undefined') module.exports = Atterrir;
+
+</script>
+<script>
+// Contours très simplifiés (longitude, latitude) — découpage par continents d'Our World in Data
+const CARTE = {
+  nam: [
+    [[-166,68],[-157,71],[-141,70],[-128,70],[-115,68.5],[-100,68],[-94,71],[-85,69.5],[-81,64],[-88,58],[-93,59],[-94,56],[-85,55],[-80,52],[-79,56],[-77,61],[-72,62],[-65,60],[-61,56],[-56,52],[-60,47],[-66,45],[-70,42],[-74,40],[-76,37],[-76,35],[-81,31],[-80,26],[-81,25],[-83,28],[-85,30],[-89,30],[-94,29.5],[-97,26],[-97,22],[-95,18.5],[-91,19],[-90,21.3],[-87,21.5],[-88,16],[-84,15.5],[-83,11],[-79.5,9.5],[-77.3,8.5],[-79,7.5],[-81,7.8],[-86,11],[-92,14.5],[-96,15.8],[-102,18],[-105.5,20.5],[-106,23],[-109.5,23.2],[-114,30],[-117,32.5],[-120.5,34.5],[-123,38],[-124,42],[-124,47],[-125,49],[-128,51],[-131,54],[-134,57],[-138,59],[-145,60.5],[-150,59.5],[-154,58],[-158,56.5],[-162,55],[-160,58.5],[-165,60.5],[-165,63],[-162,64.5],[-166,65.5]],
+    [[-73,78],[-62,81.5],[-40,83],[-22,82],[-18,77],[-20,71],[-25,68.5],[-35,65.5],[-43,60],[-48,61.5],[-52,65],[-54,69],[-57,73.5],[-66,76.5]],
+    [[-85,21.8],[-82,23.1],[-77.5,21.8],[-74.2,20.2],[-77.5,19.9],[-80,21.5]],
+    [[-74.5,19.8],[-70,19.8],[-68.5,18.5],[-71.5,17.7],[-74.4,18.4]],
+  ],
+  sam: [
+    [[-77.3,8.5],[-75.5,10.5],[-72,12],[-68,10.6],[-63,10.7],[-60,8.5],[-57,6],[-52,5],[-50,1.8],[-49,-0.5],[-44.5,-2.5],[-40,-2.8],[-35,-5.5],[-35,-9.5],[-38.5,-13],[-39,-17],[-40.5,-21],[-42,-23],[-48,-25.8],[-49,-28.5],[-53,-33.7],[-57.5,-35],[-58,-38.5],[-62,-39],[-65,-41],[-64,-43],[-67.5,-46.5],[-66,-48],[-69,-51],[-68.5,-52.5],[-71,-54],[-74.5,-52.5],[-75.5,-48],[-74,-44],[-73.5,-38],[-71.5,-30],[-70.5,-18.5],[-75,-15],[-77.5,-11],[-79.5,-7],[-81,-4.5],[-80,-1.5],[-80,1],[-78.5,2],[-77.5,4],[-77.5,7]],
+  ],
+  eur: [
+    [[-9.5,37],[-8.8,42.5],[-9,43.3],[-1.8,43.4],[-1.2,46],[-4.6,48.3],[-1.6,48.7],[-1.3,49.7],[1.5,50.2],[3.5,51.4],[4.8,53.2],[8.6,53.9],[8.3,55.5],[8.5,57.1],[10.5,57.6],[10.4,56.2],[9.9,54.8],[11,54],[14.2,53.9],[18.6,54.6],[21.1,56],[21.5,57.5],[24,57.3],[23.5,59.2],[28.5,59.6],[30.2,59.9],[28,60.5],[25,60.3],[22.5,60.3],[21.4,61.5],[21.5,63.5],[25,65],[25.5,65.8],[22,65.7],[20.5,63.8],[18.5,62.5],[17.2,61],[18.7,59.8],[16.8,57.5],[16.3,56.3],[14.2,55.5],[12.9,55.4],[12.5,56.3],[11.8,58],[10.6,59.2],[9.8,58.9],[7.5,58.1],[5.7,58.5],[5,61],[5.4,62.3],[8.3,63.5],[11,64.6],[13.3,67.3],[15.5,68.6],[18.5,69.8],[23.5,70.7],[28,71.1],[31,70.2],[33,69.4],[36.5,69],[41,67.6],[44,68.4],[46,67.8],[53,68.5],[59,68.5],[66,69.5],[69,72.8],[73,72.5],[75,71.4],[80,72.5],[87,74],[95,76],[104,77.6],[113,73.7],[124,73.5],[130,71],[140,72.5],[150,71.5],[160,69.7],[170,70],[180,68.5],[180,65],[178,64.6],[176,62.5],[171,60],[164,59.9],[163,56],[162,54.5],[158.5,52.5],[156.5,51],[156,57],[160,61.5],[156,61.5],[151,59.3],[143,59.3],[137,54],[141,52.5],[140.5,48.5],[135,43.5],[131.5,42.6],[130.6,42.4],[131,45],[133.5,48],[127,49.5],[124,53],[121,53.3],[119,50],[115.5,49.8],[111,49.3],[107,50.5],[98,52],[95,50],[87.5,49.2],[83,50.8],[79,52.5],[76,54],[73.5,54],[70,55],[61,54],[61,51.5],[55,50.6],[50,51.5],[48,49.5],[47,48],[48.5,46.5],[47.2,44.8],[47.5,42.5],[40,43.5],[37.5,45],[35,45.2],[33.5,46],[31,46.6],[30,45.5],[28.7,44.2],[28,43],[27.9,42],[26.3,40.9],[24,40.6],[23.5,38],[22.4,36.5],[21.2,37.8],[20,39.5],[19.4,41.8],[16,43.5],[13.7,45.5],[12.3,45],[12.5,44],[14.5,42],[16,41.5],[18.5,40.2],[16.5,38.4],[15.7,40],[12.5,41.6],[10.5,43],[8.8,44.4],[7.5,43.8],[4.5,43.4],[3.1,42.4],[3.2,41.8],[0.9,41],[-0.2,39.5],[0.2,38.7],[-0.7,37.6],[-2.1,36.7],[-4.4,36.7],[-5.6,36],[-7,37.2],[-8.8,37]],
+    [[-5.7,50],[1.4,51.2],[1.7,52.7],[0.2,53.5],[-1.6,55.6],[-2,57.6],[-3.6,58.6],[-5,58.6],[-6.2,56.8],[-5.5,55.5],[-4.9,54.8],[-3,54],[-3,53.3],[-4.6,52.8],[-5.2,51.7],[-3.5,51.4]],
+    [[-6.2,52],[-6,53.9],[-7.3,55.3],[-8.5,54.5],[-10,53.5],[-9.8,51.6],[-8,51.6]],
+    [[-22.5,64],[-18,66.5],[-14,66],[-13.5,65],[-18,63.4],[-22.5,63.8]],
+  ],
+  afr: [
+    [[-17.1,20.8],[-16,23.8],[-13,27.6],[-9.8,29.9],[-9.6,32.5],[-6.8,34],[-5.9,35.8],[-2,35.1],[1,36.5],[10,37.3],[11.1,35.2],[10.1,34.3],[11.5,33.1],[15.2,32.3],[19.6,30.5],[20.1,32.4],[25,31.9],[29.6,31.1],[32.3,31.3],[34.2,31.3],[34.9,29.5],[34.3,27.8],[32.6,29.9],[32.7,29],[35.5,23.9],[37.2,19],[38.5,18],[39.5,15.5],[41.7,13.6],[43.3,11.9],[44.5,10.4],[51.2,11.8],[51,10.4],[49.5,6.5],[48,4.5],[45.5,2],[43,-0.5],[41.5,-1.8],[40.2,-3],[39.2,-5],[39.5,-8],[40.5,-10.5],[40.6,-14.5],[36.9,-17.5],[35.3,-21.5],[35.5,-24],[32.6,-26],[32.4,-29],[30.5,-31],[27.9,-33.3],[25.6,-34],[20,-34.8],[18.4,-34],[18.3,-32.2],[16.5,-28.6],[15.2,-27],[14.4,-23],[11.8,-17.3],[13.5,-12.5],[13.2,-8.8],[12.2,-6],[9.3,-1],[9.8,2.5],[8.7,4.5],[6,4.3],[4.5,6.3],[1.5,6.1],[-2,4.8],[-4.5,5.2],[-7.5,4.4],[-9.4,5.4],[-11.5,6.9],[-13.3,8.8],[-15,10.9],[-16.7,12.5],[-17.5,14.7],[-16.5,16.2],[-16.1,18.5]],
+    [[49.3,-12],[50.5,-15.5],[49.8,-17.5],[47.1,-24.9],[45.2,-25.6],[43.7,-23.5],[43.3,-21.8],[44.4,-19.5],[44,-17],[46.3,-15.7],[48,-14]],
+  ],
+  asi: [
+    [[26.3,40.9],[28,42],[29,41.2],[31.5,41.2],[35,42],[38,41],[41.5,41.5],[40,43.5],[47.5,42.5],[47.2,44.8],[48.5,46.5],[47,48],[48,49.5],[50,51.5],[55,50.6],[61,51.5],[61,54],[70,55],[73.5,54],[76,54],[79,52.5],[83,50.8],[87.5,49.2],[95,50],[98,52],[107,50.5],[111,49.3],[115.5,49.8],[119,50],[121,53.3],[124,53],[127,49.5],[133.5,48],[131,45],[130.6,42.4],[129.5,40.8],[129.4,37],[129.3,35.2],[126.5,34.4],[126.3,36.5],[126.6,37.7],[125,39.5],[122,40.5],[121.6,39],[119.5,39.8],[118,39],[118.8,37.5],[122.5,37],[119,35],[120.8,32],[121.9,31],[121.5,29.5],[120,26.5],[117.5,23.6],[113.5,22.2],[110.5,21.2],[108.2,21.5],[106.6,20.2],[105.6,18.8],[107.5,16.4],[109.2,13],[109,11.4],[106.8,10.4],[104.8,8.7],[104.9,10.5],[103,11.5],[100.9,12.6],[99.2,10.4],[100.4,7.5],[102,6.2],[103.4,4],[104.3,1.4],[103.4,1.3],[101.3,2.9],[100.3,5.5],[98.5,8.2],[98.3,10.5],[98.6,13.5],[97.6,16.5],[94.5,16],[94.2,19],[92.4,21],[91.6,22.6],[90.5,22],[88.9,21.6],[86.9,20.8],[85,19.4],[82.3,16.6],[80.3,15.5],[80.2,13],[79.9,10.3],[78.2,8.9],[77.5,8.1],[76.6,8.9],[75.7,11.3],[74.5,14.6],[73.4,16.5],[72.8,19],[72.8,21],[70.5,20.8],[69,22.3],[68.5,23.6],[67.4,24.6],[66.7,25.4],[61.6,25.2],[57.3,25.8],[56.4,27.1],[54.7,26.5],[51.6,27.9],[50.1,30.1],[48.5,30],[50.2,26.5],[50.8,24.8],[51.6,24.2],[54,24.2],[56,26],[56.4,24.9],[57.8,23.7],[59.8,22.5],[58.5,20.5],[57.8,19],[55.2,17.4],[52.2,15.9],[49.5,14.7],[45,12.8],[43.5,12.7],[42.7,15.5],[41.2,18.6],[39.1,21.6],[37.4,24.3],[35.1,28],[34.9,29.5],[34.2,31.3],[34.9,32.8],[35.6,34.6],[35.9,36.4],[34.6,36.8],[32.5,36.1],[30.6,36.7],[28.3,36.8],[27.2,37.4],[26.3,38.3],[26.2,40.1]],
+    [[130.2,31.3],[131.4,31.5],[132,33.8],[134.6,34.2],[135.8,33.5],[136.9,34.5],[138.8,34.7],[140.8,35.7],[141,38.3],[142,39.6],[141.4,41.4],[140.4,41.5],[139.9,39.8],[139.4,38.2],[137.3,36.8],[136,35.7],[133.2,35.5],[131.2,34.4],[129.7,33.5]],
+    [[140,41.8],[141.2,41.8],[143.3,42],[145.6,43.3],[144.3,44.1],[141.6,45.4],[141.4,43.3],[140,42.5]],
+    [[79.9,7],[80.3,9.8],[81.8,7.5],[81.2,6.2],[80.1,6]],
+    [[120.1,23],[121,25.2],[121.9,24.8],[120.8,22]],
+    [[95.3,5.6],[97.5,5.2],[100.4,2.2],[103.8,-1],[106,-3],[105.8,-5.8],[104.5,-5.9],[102.3,-4],[100.4,-1.3],[98.7,1.7],[95.9,3.8]],
+    [[105.2,-6.8],[106.5,-6],[108.6,-6.7],[111,-6.4],[112.7,-6.9],[114.5,-7.8],[114.4,-8.7],[111,-8.2],[108,-7.8],[106.4,-7.4]],
+    [[109,1.5],[109.6,-0.6],[110.2,-2.9],[111.8,-3.5],[114.6,-4.1],[116,-3.6],[116.6,-1.5],[117.9,1],[118,2.3],[119.2,5.4],[117.2,7],[116,6.3],[115.1,4.8],[113.2,3.1],[111.2,2.4],[110,1.8]],
+    [[120.6,18.5],[122.3,18.4],[122.2,16.3],[121.6,15.6],[124,13.5],[123.9,12.9],[120.6,14.4],[119.8,16.4]],
+    [[122,7],[123.6,7.8],[124.5,8.9],[125.5,9.7],[126.5,7.5],[126,6.3],[125.4,5.6],[124.2,6.1]],
+  ],
+  oce: [
+    [[113.6,-22],[113.4,-26],[114.9,-29],[115,-33.6],[116,-35],[118,-35],[121.5,-33.8],[124,-33],[126.2,-32.2],[131.2,-31.5],[134.2,-32.9],[135.6,-34.8],[137.8,-33],[138.6,-34.8],[139.6,-36.9],[141.5,-38.4],[144,-38.4],[146.3,-39.1],[147.9,-37.9],[150,-37.5],[151.3,-33.9],[153.1,-30.4],[153.1,-25.5],[150.8,-22.6],[149,-20.7],[146.3,-18.8],[145.3,-14.9],[143.5,-12.8],[142.5,-10.7],[141.6,-12.9],[141.5,-15.7],[140.5,-17.4],[139.3,-17.4],[136.8,-15.7],[135.9,-15.1],[136.8,-12.2],[133.5,-11.6],[132.4,-11.4],[130.3,-12.4],[129.6,-14.8],[127.8,-14.3],[125.9,-14.5],[124.1,-16.4],[122.3,-17.5],[121.2,-19.4],[118.8,-20.3],[116.7,-20.7],[114.6,-21.8]],
+    [[144.6,-40.7],[148.3,-40.9],[148,-43.2],[146.9,-43.6],[145.2,-42.2]],
+    [[172.7,-34.4],[174.4,-35.6],[175.5,-37],[178,-37.6],[177.3,-39.2],[176.9,-40.2],[175.2,-41.6],[174.6,-41.2],[175,-39.7],[174.1,-39.2],[174.6,-37.3],[173.1,-35.3]],
+    [[172.7,-40.5],[174.3,-41.3],[173.2,-43],[171.2,-44.5],[170.6,-45.9],[169,-46.6],[166.5,-46],[166.9,-45.1],[168.4,-44],[170.8,-42.8],[172.1,-41.4]],
+    [[130.9,-0.9],[134.2,-0.9],[135.5,-3.3],[137.8,-1.5],[141,-2.6],[144.5,-3.8],[145.9,-5.5],[147.6,-6.1],[147.3,-7.9],[148.6,-9.1],[150.8,-10.3],[149.7,-10.4],[147.5,-10.1],[146.1,-8.1],[144.2,-7.7],[143.3,-9],[141,-9.1],[139.1,-8.1],[138,-8.4],[137.6,-7.5],[138.7,-6.9],[138.4,-5.1],[135.5,-4.5],[133.3,-4],[132.3,-2.6],[131.3,-1.6]],
+  ],
+};
+const LACS = [
+  [[47.5,42.8],[49.5,40.5],[49.2,38.4],[51,36.8],[53.9,37],[53.2,40],[52.8,41.5],[51,45],[53,46.8],[51,47.2],[49,46.5],[47,44.5]],
+];
+const ETIQUETTES = { nam: [-100, 50], sam: [-60, -14], eur: [62, 61], afr: [20, 8], asi: [92, 34], oce: [134, -25] };
+
+</script>
+<script>
+// =====================================================================
+//  ATTERRIR — interface (lit et modifie l'état produit par le moteur)
+// =====================================================================
+(() => {
+  'use strict';
+  const A = Atterrir, fr = A.fr, NB = '\u00a0';
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const CLE = 'atterrir.partie.v1';
+  const NIVEAUX = ['aucun', 'modéré', 'fort', 'maximal'];
+  const SPH = {
+    atmo: ['Atmosphère', 'var(--atmo)'], hydro: ['Hydrosphère', 'var(--hydro)'], cryo: ['Cryosphère', 'var(--cryo)'],
+    litho: ['Lithosphère', 'var(--litho)'], bio: ['Biosphère', 'var(--bio)'], anthropo: ['Anthroposphère', 'var(--anthropo)'],
+  };
+  const DESC_LIMITES = {
+    climat: 'Concentration de CO₂ dans l’atmosphère.',
+    biosphere: 'Part des espèces et des écosystèmes encore intacts.',
+    sols: 'Forêts restantes par rapport à leur surface d’origine.',
+    eau: 'Perturbation du cycle de l’eau douce : rivières, nappes, humidité des sols.',
+    azote: 'Engrais azotés et phosphatés qui ruissellent vers les rivières et les mers.',
+    acid: 'Le CO₂ dissous rend l’océan plus acide : coquillages et coraux en souffrent.',
+    nouvelles: 'Plastiques, pesticides et substances chimiques nouvelles dans l’environnement.',
+    aerosols: 'Particules en suspension (fumées, sulfates) qui perturbent les moussons. Elles refroidissent aussi un peu le climat.',
+    ozone: 'Grâce au protocole de Montréal (1987), la couche d’ozone se reconstitue : la preuve qu’une limite peut être réparée.',
+  };
+  const DESC_PLANCHERS = {
+    revenu: 'Revenu moyen sous 12 000 $ par habitant.',
+    alim: 'Production alimentaire accessible inférieure aux besoins.',
+    energie: 'Moins de 30 GJ d’énergie par habitant et par an (à efficacité égale à celle de 2025 : une maison mieux isolée chauffe autant avec moins).',
+    stab: 'Stabilité sociale sous 45 sur 100.',
+  };
+  const TYPES = {
+    debut: 'var(--encre-2)', evenement: 'var(--atmo)', bascule: 'var(--alerte)', crise: 'var(--manque)',
+    sortie: 'var(--donut)', ressource: 'var(--ocre)',
+  };
+
+  let st = null, onglet = 'politiques', regionSel = 'asi', metrique = 'co2hab';
+  let zoneFixe = null, nonLus = 0;
+
+  // ---------- Utilitaires ----------
+  const pct = (x, d = 0) => `${fr(x * 100, d)}${NB}%`;
+  const deg = x => `${x >= 0 ? '+' : '−'}${fr(Math.abs(x), 2)}${NB}°C`;
+  const signe = (x, d = 1) => `${x >= 0 ? '+' : '−'}${fr(Math.abs(x), d)}`;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const popTot = () => st.regions.reduce((a, r) => a + r.pop, 0);
+  const doublement = g => (g > 0.0005 ? Math.round(Math.log(2) / Math.log(1 + g)) : null);
+  const popTexte = m => (m >= 1000 ? `${fr(m / 1000, 2)}${NB}milliards` : `${fr(m, 0)}${NB}millions`);
+  const def = id => A.BASCULES.find(b => b.id === id);
+  const bascule = id => st.bascules.find(b => b.id === id);
+
+  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(st)); } catch (e) { /* stockage indisponible */ } }
+  function charger() {
+    try {
+      const s = localStorage.getItem(CLE);
+      if (!s) return null;
+      const o = JSON.parse(s);
+      return o && o.version === 1 && o.regions ? o : null;
+    } catch (e) { return null; }
+  }
+  function graineAdresse() { const m = location.hash.match(/^#s(\d{1,9})$/); return m ? +m[1] : null; }
+  const nouvelleGraine = () => 1 + Math.floor(Math.random() * 999999);
+
+  // ---------- Rendu général ----------
+  function rendre() {
+    rendreEntete(); rendreDonut(); rendreBocal();
+    rendrePolitiques(); rendreRegions(); rendreRessources(); rendreSpheres(); rendreJournal();
+    majOnglets();
+  }
+
+  function rendreEntete() {
+    const g = st.g, cout = A.coutTotal(st.leviers);
+    $('#m-annee').innerHTML = `${st.year} <small>${st.fini ? 'fin' : `tour ${st.tour + 1}/15`}</small>`;
+    $('#m-temp').textContent = deg(g.T);
+    $('#m-ppm').textContent = `${Math.round(g.ppm)}${NB}ppm`;
+    $('#m-pop').textContent = popTexte(popTot());
+    $('#m-cap').innerHTML = `${cout} <small>sur ${st.budget}</small>`;
+    for (const b of $$('.avancer')) {
+      b.disabled = !st.fini && cout > st.budget;
+      b.textContent = st.fini ? 'Voir le bilan' : `Avancer jusqu’en ${st.year + 5}`;
+    }
+  }
+
+  // ---------- Donut ----------
+  const R_IN = 96, R_OUT = 136;
+  function pt(r, a) {
+    const t = (a - 90) * Math.PI / 180;
+    return [+(r * Math.cos(t)).toFixed(2), +(r * Math.sin(t)).toFixed(2)];
+  }
+  function secteur(r1, r2, a1, a2) {
+    const l = a2 - a1 > 180 ? 1 : 0;
+    const [x1, y1] = pt(r2, a1), [x2, y2] = pt(r2, a2), [x3, y3] = pt(r1, a2), [x4, y4] = pt(r1, a1);
+    return `M${x1} ${y1}A${r2} ${r2} 0 ${l} 1 ${x2} ${y2}L${x3} ${y3}A${r1} ${r1} 0 ${l} 0 ${x4} ${y4}Z`;
+  }
+  const franchies = () => A.LIMITES.filter(l => l.ratio(st.g) > 1).length;
+
+  function rendreDonut() {
+    const g = st.g, pas = 360 / A.LIMITES.length;
+    const manques = A.manquesSociaux(st);
+    let ext = '', int = '', lbl = '', zones = '';
+    A.LIMITES.forEach((l, i) => {
+      const a1 = i * pas + 1.6, a2 = (i + 1) * pas - 1.6, am = (i + 0.5) * pas;
+      const r = l.ratio(g);
+      ext += `<path d="${secteur(R_IN, R_IN + Math.min(1, r) * (R_OUT - R_IN), a1, a2)}" fill="var(--donut)" opacity="0.6"/>`;
+      if (r > 1) {
+        const len = Math.min(1.9, r - 1) * 38;
+        ext += `<path class="ext" d="${secteur(R_OUT, R_OUT + len, a1, a2)}" fill="${r > l.hr ? 'var(--alerte)' : 'var(--ocre)'}"/>`;
+      }
+      const [x, y] = pt(226, am);
+      const s = Math.sin(am * Math.PI / 180), c = Math.cos(am * Math.PI / 180);
+      const anchor = s > 0.3 ? 'start' : s < -0.3 ? 'end' : 'middle';
+      lbl += `<text class="lbl" x="${x}" y="${(y + (c > 0.6 ? -2 : c < -0.6 ? 12 : 4)).toFixed(1)}" text-anchor="${anchor}">${l.court}</text>`;
+      zones += `<path class="zone" tabindex="0" role="button" aria-label="${esc(l.nom)}" data-z="e${i}" d="${secteur(R_IN, 214, a1 - 1.6, a2 + 1.6)}"/>`;
+    });
+    manques.forEach((m, i) => {
+      const a1 = i * 90 + 3, a2 = (i + 1) * 90 - 3, am = (i + 0.5) * 90;
+      const len = Math.min(76, m.manque * 160);
+      if (len > 0.5) int += `<path class="int" d="${secteur(R_IN - len, R_IN, a1, a2)}" fill="var(--manque)" opacity="0.85"/>`;
+      const [x, y] = pt(66, am);
+      lbl += `<text class="lbl-soc" x="${x}" y="${y + 4}" text-anchor="middle">${m.court}</text>`;
+      zones += `<path class="zone" tabindex="0" role="button" aria-label="Plancher social : ${esc(m.nom)}" data-z="s${i}" d="${secteur(20, R_IN, a1 - 3, a2 + 3)}"/>`;
+    });
+    const n = franchies();
+    $('#donut').innerHTML = `
+      <svg viewBox="-272 -250 544 500" role="img" aria-labelledby="donut-titre">
+        <title id="donut-titre">Donut : ${n} limites planétaires franchies sur 9</title>
+        <circle r="${(R_IN + R_OUT) / 2}" fill="none" stroke="var(--donut-pale)" stroke-width="${R_OUT - R_IN}"/>
+        ${ext}
+        <circle r="${R_IN}" fill="none" stroke="var(--donut)" stroke-width="1.5"/>
+        <circle r="${R_OUT}" fill="none" stroke="var(--donut)" stroke-width="1.5"/>
+        ${int}${lbl}
+        <text class="annee" y="2" text-anchor="middle">${st.year}</text>
+        <text class="sous-annee" y="20" text-anchor="middle">${n} limites franchies</text>
+        ${zones}
+      </svg>`;
+    majDetail(zoneFixe);
+  }
+
+  function majDetail(z) {
+    const el = $('#detail-donut');
+    el.className = 'detail-donut';
+    if (!z) {
+      const sous = A.partSousPlancher(st);
+      el.innerHTML = `<strong>${franchies()} limites planétaires franchies sur 9</strong>
+        ${sous > 0.005 ? `${pct(sous)} de la population vit dans une région sous le plancher social.` : 'Toutes les régions sont au-dessus du plancher social.'}
+        Touchez une part du donut pour le détail.`;
+      return;
+    }
+    if (z[0] === 'e') {
+      const l = A.LIMITES[+z.slice(1)], r = l.ratio(st.g);
+      const etat = r <= 1 ? 'Dans l’espace sûr.' : r <= l.hr ? 'Limite franchie : zone d’incertitude, le risque augmente.' : 'Zone à haut risque.';
+      el.classList.add(r <= 1 ? 'sur' : r <= l.hr ? 'ocre' : 'alerte');
+      el.innerHTML = `<strong>${l.nom}</strong>${l.val(st.g)} (${l.seuil}). ${etat}<br>${DESC_LIMITES[l.id]}`;
+    } else {
+      const p = A.PLANCHERS[+z.slice(1)];
+      const sous = st.regions.filter(r => p.val(r) < 0.97).map(r => r.court);
+      el.classList.add('manque');
+      el.innerHTML = `<strong>Plancher social : ${p.nom}</strong>${DESC_PLANCHERS[p.id]}
+        ${sous.length ? `Sous le plancher : ${sous.join(', ')}.` : 'Aucune région sous le plancher.'}`;
+    }
+  }
+
+  function rendreBocal() {
+    const b = A.budgetCarbone(st), part = Math.max(0, Math.min(1, b.part));
+    const h = 58 * part, coul = part > 0.8 ? 'var(--alerte)' : part > 0.5 ? 'var(--ocre)' : 'var(--atmo)';
+    const croiss = A.croissanceMondiale(st), dbl = doublement(croiss);
+    $('#bocal').innerHTML = `
+      <svg viewBox="0 0 54 84" aria-hidden="true">
+        <defs><clipPath id="interieur"><path d="M10 18h34v54a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8z"/></clipPath></defs>
+        <rect x="6" y="80" width="42" height="0"/>
+        <g clip-path="url(#interieur)"><rect x="10" y="${(80 - h).toFixed(1)}" width="34" height="${h.toFixed(1)}" fill="${coul}"/></g>
+        <path d="M10 18h34v54a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8z" fill="none" stroke="var(--encre)" stroke-width="2"/>
+        <rect x="14" y="8" width="26" height="10" rx="2" fill="none" stroke="var(--encre)" stroke-width="2"/>
+      </svg>
+      <div>
+        <p>Budget carbone pour rester sous +2${NB}°C : <strong>${pct(part)}</strong> consommé depuis 2025.
+        ${b.part >= 1 ? 'Il est épuisé.' : `Au rythme actuel, il sera épuisé dans ${Math.round(b.anneesRestantes)}${NB}ans.`}</p>
+        <p>${croiss > 0.0005
+          ? `Économie mondiale : ${signe(croiss * 100)}${NB}% par an. À ce rythme, elle double tous les ${dbl}${NB}ans.`
+          : `Économie mondiale : ${signe(croiss * 100)}${NB}% par an.`}</p>
+      </div>`;
+  }
+
+  // ---------- Politiques ----------
+  function etatLevier(id) {
+    const g = st.g;
+    const riches = st.regions.filter(r => r.yEff > A.SEUIL_RICHE).map(r => r.court);
+    const lc = st.regions.reduce((a, r) => a + r.E * r.s, 0) / st.regions.reduce((a, r) => a + r.E, 0);
+    const afr = st.regions.find(r => r.id === 'afr');
+    switch (id) {
+      case 'bascarbone': return `Part bas-carbone de l’énergie mondiale : ${pct(lc)}.`;
+      case 'efficacite': return `Effet rebond actuel : ${pct(g.rebond)} des économies sont reconsommées.`;
+      case 'sobriete': return riches.length ? `Concerne aujourd’hui : ${riches.join(', ')}.` : 'Aucune région au-dessus de 30 000 $/hab.';
+      case 'protection': return `Stabilité sociale moyenne : ${Math.round(A.stabiliteMoyenne(st))}/100.`;
+      case 'forets': return `Couvert forestier : ${fr(g.foret, 1)}${NB}% de la surface d’origine.`;
+      case 'agro': return `Engrais azotés : ${Math.round(g.azote)}${NB}Mt par an.`;
+      case 'peche': return `Prises : ${Math.round(g.prises)}${NB}Mt par an.`;
+      case 'circulaire': return `Stock de métaux extractibles : ${pct(g.metaux / g.metaux0)} de celui de 2025.`;
+      case 'solidarite': return `Stabilité de l’Afrique : ${Math.round(afr.S)}/100.`;
+      default: return '';
+    }
+  }
+
+  function rendrePolitiques() {
+    const cout = A.coutTotal(st.leviers), b = st.budget, dep = cout > b;
+    let seg = '';
+    for (let i = 0; i < Math.max(b, cout); i++) seg += `<i class="${i >= b ? 'trop' : i < cout ? 'plein' : ''}"></i>`;
+    const aide = st.fini ? 'La partie est terminée.'
+      : dep ? `Il manque ${cout - b} point${cout - b > 1 ? 's' : ''} : baissez une politique pour pouvoir avancer.`
+        : 'Chaque politique peut monter d’un niveau par tour au maximum. Votre capital dépend de la stabilité des sociétés.';
+    let rows = '';
+    for (const l of A.LEVIERS) {
+      const n = st.leviers[l.id], p = st.leviersPrec[l.id];
+      let btns = '';
+      for (let k = 0; k <= 3; k++) {
+        const off = st.fini || k > p + 1;
+        btns += `<button type="button" data-l="${l.id}" data-n="${k}" aria-pressed="${k === n}" ${off ? 'disabled' : ''}
+          aria-label="${esc(l.nom)} : niveau ${k}, ${NIVEAUX[k]}${off && !st.fini ? ' (pas encore accessible)' : ''}">${k}</button>`;
+      }
+      const [nomSph, coul] = SPH[l.sphere];
+      rows += `<li class="levier">
+        <div>
+          <h3><span class="pastille" style="--c:${coul}" title="${nomSph}"></span>${l.nom}</h3>
+          <p class="effet">${l.effet}</p>
+          <p class="revers">${l.revers}</p>
+          <p class="etat">${etatLevier(l.id)}</p>
+        </div>
+        <div class="reglage">
+          <div class="niveaux" role="group" aria-label="Niveau : ${esc(l.nom)}">${btns}</div>
+          <span class="cout">${NIVEAUX[n]}, coût ${A.COUTS[n]}${n !== p ? ` (avant : ${NIVEAUX[p]})` : ''}</span>
+        </div>
+      </li>`;
+    }
+    $('#p-politiques').innerHTML = `
+      <div class="budget ${dep ? 'depasse' : ''}">
+        <div class="budget-tete"><strong>Capital politique</strong><span>${cout} utilisé${cout > 1 ? 's' : ''} sur ${b}</span></div>
+        <div class="jauge-budget" aria-hidden="true">${seg}</div>
+        <p class="aide" role="status">${aide}</p>
+      </div>
+      <ul class="leviers">${rows}</ul>`;
+  }
+
+  // ---------- Régions ----------
+  const K = 700 / 352;
+  const proj = ([lon, lat]) => [((lon + 170) * K).toFixed(1), ((84 - lat) * K).toFixed(1)];
+  const chemin = poly => 'M' + poly.map(p => proj(p).join(' ')).join('L') + 'Z';
+  function metriques() {
+    const cumTot = st.regions.reduce((a, r) => a + r.cumCO2, 0);
+    return {
+      co2hab: { nom: 'CO₂ par habitant', val: r => r.co2 / r.pop * 1000, fmt: v => `${fr(v, 1)}${NB}t/hab.`, max: 14, bas: '0 t', haut: '14 t' },
+      hist: { nom: 'Part du CO₂ depuis 1850', val: r => r.cumCO2 / cumTot, fmt: v => pct(v), max: 0.35, bas: '0 %', haut: '35 %' },
+      stab: { nom: 'Stabilité sociale', val: r => r.S, fmt: v => `${Math.round(v)}/100`, max: 100, bien: true, bas: '0', haut: '100' },
+      dmg: { nom: 'Dommages climatiques', val: r => r.dmg, fmt: v => `${fr(v * 100, 1)}${NB}% du PIB`, max: 0.08, bas: '0 %', haut: '8 %' },
+    };
+  }
+  function couleur(m, v) {
+    const p = Math.round(Math.max(0, Math.min(1, v / m.max)) * 100);
+    return m.bien ? `color-mix(in oklab, var(--donut) ${p}%, var(--alerte))` : `color-mix(in oklab, var(--alerte) ${p}%, var(--surface-2))`;
+  }
+
+  function rendreRegions() {
+    const M = metriques(), m = M[metrique];
+    let choix = '';
+    for (const [k, x] of Object.entries(M)) choix += `<button type="button" data-m="${k}" aria-pressed="${k === metrique}">${x.nom}</button>`;
+    let terres = '', noms = '';
+    for (const r of st.regions) {
+      const v = m.val(r);
+      terres += `<g class="region ${r.id === regionSel ? 'sel' : ''}" data-r="${r.id}" tabindex="0" role="button"
+        aria-label="${esc(r.nom)} : ${esc(m.fmt(v))}" aria-pressed="${r.id === regionSel}">
+        ${CARTE[r.id].map(p => `<path class="terre" d="${chemin(p)}" fill="${couleur(m, v)}"/>`).join('')}</g>`;
+      const [x, y] = proj(ETIQUETTES[r.id]);
+      noms += `<text class="nom halo" x="${x}" y="${y}" text-anchor="middle">${r.court}</text>
+        <text class="val halo" x="${x}" y="${+y + 15}" text-anchor="middle">${m.fmt(v)}</text>
+        ${r.crise ? `<text class="val halo" x="${x}" y="${+y + 29}" text-anchor="middle" style="fill:var(--alerte)">en crise</text>` : ''}`;
+    }
+    const lacs = LACS.map(p => `<path class="lac" d="${chemin(p)}"/>`).join('');
+    const a = m.bien ? 'var(--alerte)' : 'var(--surface-2)', b = m.bien ? 'var(--donut)' : 'var(--alerte)';
+    $('#p-regions').innerHTML = `
+      <p class="intro-panneau">Ceux qui ont le plus émis ne sont pas ceux qui subissent le plus. Touchez une région pour sa fiche.</p>
+      <div class="choix" role="group" aria-label="Indicateur affiché">${choix}</div>
+      <div class="carte"><svg viewBox="0 0 700 281" aria-label="Carte schématique des régions">${terres}${lacs}${noms}</svg></div>
+      <div class="echelle" style="--a:${a};--b:${b}"><span>${m.bas}</span><i></i><span>${m.haut}</span></div>
+      ${ficheRegion()}`;
+  }
+
+  function ficheRegion() {
+    const r = st.regions.find(x => x.id === regionSel);
+    const cumTot = st.regions.reduce((a, x) => a + x.cumCO2, 0);
+    const co2Tot = st.regions.reduce((a, x) => a + x.co2, 0), pt = popTot();
+    const co2h = r.co2 / r.pop * 1000, moy = co2Tot / pt * 1000;
+    const dbl = doublement(r.gEff);
+    const phrase = r.id === 'afr'
+      ? `L’Afrique compte ${pct(r.pop / pt)} de la population mondiale mais n’a émis que ${pct(r.cumCO2 / cumTot)} du CO₂ depuis 1850. C’est pourtant la région la plus exposée aux dommages climatiques.`
+      : `Un habitant émet ${fr(co2h, 1)}${NB}t de CO₂ par an, soit ${fr(co2h / moy, 1)} fois la moyenne mondiale. La région a émis ${pct(r.cumCO2 / cumTot)} du CO₂ cumulé depuis 1850.`;
+    const sc = r.S < 35 ? 'var(--alerte)' : r.S < 50 ? 'var(--ocre)' : 'var(--donut)';
+    return `<div class="fiche">
+      <h3>${r.nom}${r.crise ? '<span class="badge">en crise</span>' : ''}</h3>
+      <p class="phrase">${phrase}</p>
+      <dl class="chiffres">
+        <div><dt>Population</dt><dd>${popTexte(r.pop)}</dd></div>
+        <div><dt>PIB par habitant</dt><dd>${fr(r.yEff, 0)}${NB}$</dd></div>
+        <div><dt>Croissance</dt><dd>${signe(r.gEff * 100)}${NB}%/an ${dbl ? `<small>double en ${dbl}${NB}ans</small>` : ''}</dd></div>
+        <div><dt>Énergie</dt><dd>${fr(A.energieParHab(r), 0)}${NB}GJ/hab.</dd></div>
+        <div><dt>Énergie bas-carbone</dt><dd>${pct(r.s)}</dd></div>
+        <div><dt>Émissions de CO₂</dt><dd>${fr(r.co2, 1)}${NB}Gt/an</dd></div>
+        <div><dt>Stabilité sociale</dt><dd>${Math.round(r.S)}/100<div class="barre-mini" style="--c:${sc}"><i style="width:${r.S}%"></i></div></dd></div>
+        <div><dt>Alimentation</dt><dd>${fr(r.food, 2)} <small>1 = besoins couverts</small></dd></div>
+        <div><dt>Dommages climatiques</dt><dd>${fr(r.dmg * 100, 1)}${NB}% du PIB</dd></div>
+      </dl></div>`;
+  }
+
+  // ---------- Courbes ----------
+  function courbe({ series, refs = [], ymin, ymax, yticks, yfmt = v => fr(v), w = 320, h = 170, label }) {
+    const ml = 34, mr = refs.length ? 56 : 12, mt = 8, mb = 22, x0 = 2025, x1 = 2100;
+    const X = x => (ml + (x - x0) / (x1 - x0) * (w - ml - mr)).toFixed(1);
+    const Y = y => (mt + (1 - (Math.min(ymax, Math.max(ymin, y)) - ymin) / (ymax - ymin)) * (h - mt - mb)).toFixed(1);
+    let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)}">`;
+    for (const v of yticks) {
+      s += `<line class="axe" x1="${ml}" x2="${w - mr}" y1="${Y(v)}" y2="${Y(v)}"/><text class="tick" x="${ml - 6}" y="${+Y(v) + 4}" text-anchor="end">${yfmt(v)}</text>`;
+    }
+    for (const x of [2025, 2050, 2075, 2100]) s += `<text class="tick" x="${X(x)}" y="${h - 5}" text-anchor="middle">${x}</text>`;
+    for (const r of refs) {
+      s += `<path class="ref" d="M${r.pts.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L')}"/>`;
+      const [lx, ly] = r.pts[r.pts.length - 1];
+      s += `<text class="ref-lbl" x="${+X(lx) + 4}" y="${+Y(ly) + 3}">${r.id}</text>`;
+    }
+    for (const se of series) {
+      if (!se.pts.length) continue;
+      s += `<path d="M${se.pts.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L')}" fill="none" stroke="${se.coul}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+      const [lx, ly] = se.pts[se.pts.length - 1];
+      s += `<circle cx="${X(lx)}" cy="${Y(ly)}" r="3.5" fill="${se.coul}"/>`;
+    }
+    return s + '</svg>';
+  }
+  const serie = cle => st.hist.map(h => [h.a, h[cle]]);
+  function courbeTemperature(w = 320, h = 170) {
+    const maxT = Math.max(4.6, ...st.hist.map(x => x.T + 0.2));
+    return courbe({ series: [{ pts: serie('T'), coul: 'var(--alerte)' }], refs: A.SSP, ymin: 1, ymax: maxT,
+      yticks: [1, 2, 3, 4].filter(v => v <= maxT), yfmt: v => `${v}${NB}°`, w, h,
+      label: 'Réchauffement de la partie comparé aux scénarios du GIEC' });
+  }
+
+  // ---------- Ressources ----------
+  function rendreRessources() {
+    const g = st.g, f = st.flags;
+    const rp = g.prodPetrole > 0.1 ? Math.round(g.petrole / g.prodPetrole) : null;
+    const anneesM = g.demMetaux > 0.01 ? Math.round(g.metaux / g.demMetaux) : null;
+    const maxPet = Math.max(40, ...st.hist.map(h => h.petrole));
+    const maxPois = Math.max(500, ...st.hist.map(h => h.poissons));
+    $('#p-ressources').innerHTML = `
+      <p class="intro-panneau">Un stock fini consommé à un rythme qui croît de quelques pour cent par an s’épuise beaucoup plus vite que le calcul « stock ÷ consommation actuelle » ne le laisse croire.</p>
+      <div class="blocs">
+        <section class="bloc" style="--c:var(--litho)">
+          <h3>Pétrole</h3>
+          <dl class="chiffres">
+            <div><dt>Reste extractible</dt><dd>${fr(g.petrole / 6, 0)}${NB}Gb<div class="barre-mini" style="--c:var(--litho)"><i style="width:${Math.min(100, g.petrole / g.petrole0 * 100)}%"></i></div></dd></div>
+            <div><dt>Production</dt><dd>${fr(g.prodPetrole / 6, 1)}${NB}Gb/an</dd></div>
+            <div><dt>Rendement énergétique</dt><dd>${fr(g.eroi, 1)} pour 1 <small>énergie obtenue / investie</small></dd></div>
+            <div><dt>Au rythme actuel</dt><dd>${rp ? `${rp}${NB}ans` : '—'}</dd></div>
+          </dl>
+          ${courbe({ series: [{ pts: serie('petrole'), coul: 'var(--litho)' }], ymin: 0, ymax: maxPet, yticks: [0, 20, 40, 60].filter(v => v <= maxPet), w: 300, h: 120, label: 'Production de pétrole (milliards de barils par an)' })}
+          <p class="note ${f.pic ? 'forte' : ''}">${f.pic ? `Pic pétrolier atteint en ${f.pic} : la production ne suit plus la demande.` : 'Plus le stock baisse, plus il faut d’énergie pour extraire chaque baril.'}</p>
+        </section>
+        <section class="bloc" style="--c:var(--litho)">
+          <h3>Métaux critiques</h3>
+          <dl class="chiffres">
+            <div><dt>Stock extractible</dt><dd>${pct(g.metaux / g.metaux0)}<div class="barre-mini" style="--c:var(--litho)"><i style="width:${g.metaux / g.metaux0 * 100}%"></i></div></dd></div>
+            <div><dt>Demande</dt><dd>×${fr(g.demMetaux, 2)} <small>par rapport à 2025</small></dd></div>
+            <div><dt>Au rythme actuel</dt><dd>${anneesM ? `${anneesM}${NB}ans` : '—'}</dd></div>
+            <div><dt>Pénurie</dt><dd>${pct(g.penurieMetaux)}</dd></div>
+          </dl>
+          <p class="note ${f.metaux ? 'forte' : ''}">${f.metaux ? `Pénurie depuis ${f.metaux} : la construction d’éoliennes et de réseaux ralentit.` : 'Cuivre, lithium, nickel, cobalt : la croissance et la construction des énergies bas-carbone en consomment. Le recyclage réduit la demande.'}</p>
+        </section>
+        <section class="bloc" style="--c:var(--hydro)">
+          <h3>Pêche</h3>
+          <dl class="chiffres">
+            <div><dt>Poissons dans l’océan</dt><dd>${fr(g.poissons, 0)}${NB}Mt <small>sur ${fr(g.K, 0)} possibles</small></dd></div>
+            <div><dt>Prises</dt><dd>${fr(g.prises, 0)}${NB}Mt/an</dd></div>
+          </dl>
+          ${courbe({ series: [{ pts: serie('poissons'), coul: 'var(--hydro)' }], refs: [{ id: 'mi-capacité', pts: st.hist.map(h => [h.a, h.K / 2]) }], ymin: 0, ymax: maxPois, yticks: [0, 250, 500], w: 300, h: 120, label: 'Biomasse de poissons (millions de tonnes)' })}
+          <p class="note ${f.peche ? 'forte' : ''}">${f.peche ? `Effondrement des pêcheries en ${f.peche}.` : g.poissons < g.K / 2 ? 'Le stock est sous la moitié de sa capacité : il est surexploité. C’est à mi-capacité qu’il se renouvelle le plus vite.' : 'Le stock se reconstitue.'}</p>
+        </section>
+        <section class="bloc" style="--c:var(--bio)">
+          <h3>Terres et alimentation</h3>
+          <dl class="chiffres">
+            <div><dt>Couvert forestier</dt><dd>${fr(g.foret, 1)}${NB}%</dd></div>
+            <div><dt>Production alimentaire</dt><dd>${pct(g.phi)} <small>des besoins</small></dd></div>
+            <div><dt>Engrais azotés</dt><dd>${Math.round(g.azote)}${NB}Mt/an</dd></div>
+          </dl>
+          <p class="note">Plus de terres cultivées, c’est moins de forêts. L’agroécologie et des régimes moins carnés desserrent l’étau.</p>
+        </section>
+      </div>`;
+  }
+
+  // ---------- Sphères ----------
+  function rendreSpheres() {
+    const g = st.g, pib = st.hist[st.hist.length - 1].pib;
+    const etatB = id => { const b = bascule(id); return b.active ? `basculé en ${b.annee}` : 'stable'; };
+    const crises = st.regions.filter(r => r.crise).length;
+    const blocs = [
+      ['atmo', [['Réchauffement', deg(g.T)], ['CO₂', `${Math.round(g.ppm)}${NB}ppm`], ['Émissions', `${fr(g.emissions, 1)}${NB}Gt/an`], ['Autres gaz et aérosols', `${signe(g.nonCO2, 2)}${NB}°C`]]],
+      ['hydro', [['Acidité (Ω aragonite)', fr(g.omega, 2)], ['Eau douce', `indice ${fr(g.eau, 2)}`], ['Courant atlantique', etatB('amoc')], ['Récifs coralliens', etatB('coraux')]]],
+      ['cryo', [['Banquise arctique en été', pct(g.banquise)], ['Niveau de la mer', `+${fr(g.mer * 100, 0)}${NB}cm <small>depuis 1900</small>`], ['Montée actuelle', `${fr(g.tauxMer, 1)}${NB}mm/an`], ['Groenland', etatB('groenland')]]],
+      ['litho', [['Pétrole restant', `${fr(g.petrole / 6, 0)}${NB}Gb`], ['Métaux', pct(g.metaux / g.metaux0)], ['Pergélisol', etatB('pergelisol')]]],
+      ['bio', [['Intégrité de la biosphère', `${fr(g.bii, 1)}${NB}%`], ['Forêts', `${fr(g.foret, 1)}${NB}%`], ['Amazonie', etatB('amazonie')], ['Poissons', `${fr(g.poissons, 0)}${NB}Mt`]]],
+      ['anthropo', [['Population', popTexte(popTot())], ['PIB mondial', `${fr(pib, 0)}${NB}000${NB}Md$`], ['Stabilité moyenne', `${Math.round(A.stabiliteMoyenne(st))}/100`], ['Régions en crise', `${crises}`]]],
+    ];
+    const html = blocs.map(([id, rows]) => `<section class="bloc" style="--c:${SPH[id][1]}"><h3>${SPH[id][0]}</h3>
+      <dl class="chiffres">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl></section>`).join('');
+    const echelle = v => ((v - 0.5) / 6 * 100).toFixed(2);
+    const tPos = echelle(Math.min(6.5, g.T));
+    const lignes = st.bascules.map(b => {
+      const d = def(b.id), mode = ((d.mode - d.lo) / (d.hi - d.lo) * 100).toFixed(0);
+      const fond = b.active ? 'var(--alerte)'
+        : `linear-gradient(90deg, color-mix(in oklab, var(--ocre) 18%, transparent), var(--ocre) ${mode}%, color-mix(in oklab, var(--ocre) 18%, transparent))`;
+      const stat = b.active ? `Franchi en ${b.annee}. ${d.effet}`
+        : g.T >= d.lo ? `Le réchauffement est dans la zone de risque (+${fr(d.lo, 1)} à +${fr(d.hi, 1)}${NB}°C). Le seuil exact est inconnu.`
+          : `Zone de risque entre +${fr(d.lo, 1)} et +${fr(d.hi, 1)}${NB}°C${d.foret ? `, ou si les forêts descendent sous ${d.foret}${NB}%` : ''}.`;
+      return `<li><span class="nomb"><span class="pastille" style="--c:${SPH[d.sphere][1]}"></span>${d.nom}</span>
+        <div class="risque" aria-hidden="true"><span class="plage" style="left:${echelle(d.lo)}%;width:${((Math.min(6.5, d.hi) - d.lo) / 6 * 100).toFixed(2)}%;background:${fond}"></span><span class="t" style="left:${tPos}%"></span></div>
+        <span class="stat ${b.active ? 'franchi' : ''}">${stat}</span></li>`;
+    }).join('');
+    const grad = [1, 2, 3, 4, 5, 6].map(v => `<span style="position:absolute;left:${echelle(v)}%;transform:translateX(-50%)">${v}${NB}°C</span>`).join('');
+    $('#p-spheres').innerHTML = `
+      <p class="intro-panneau">Les six sphères du système Terre sont reliées : ce qui se passe dans l’une se répercute sur les autres.</p>
+      <div class="blocs">${html}</div>
+      <h3 class="titre-section">Points de bascule</h3>
+      <p class="intro-panneau">Chaque barre montre la plage de réchauffement où le seuil se situe probablement (plus foncée au centre). Le trait vertical, c’est le réchauffement actuel. Le seuil exact de votre partie est caché.</p>
+      <ul class="bascules">${lignes}
+        <li aria-hidden="true"><span></span><div class="graduation" style="position:relative;height:16px;display:block">${grad}</div></li></ul>`;
+  }
+
+  // ---------- Journal ----------
+  function entreeHTML(e) {
+    return `<li class="entree" style="--c:${TYPES[e.type] || 'var(--trait)'}">
+      <div class="tete"><span class="an">${e.annee}</span><h3>${esc(e.titre)}</h3></div>
+      <p class="texte">${esc(e.texte)}</p>
+      ${e.lecon ? `<p class="lecon">${esc(e.lecon)}</p>` : ''}
+      ${e.confiance ? `<p class="conf">${esc(e.confiance)}</p>` : ''}</li>`;
+  }
+  function rendreJournal() {
+    const maxE = Math.max(50, ...st.hist.map(h => h.em + 2));
+    const minE = Math.min(0, ...st.hist.map(h => h.em));
+    $('#p-journal').innerHTML = `
+      <div class="courbes">
+        <figure><figcaption>Réchauffement et scénarios du GIEC</figcaption>${courbeTemperature()}</figure>
+        <figure><figcaption>Émissions de CO₂ (Gt par an)</figcaption>${courbe({ series: [{ pts: serie('em'), coul: 'var(--encre)' }], ymin: Math.floor(minE / 10) * 10, ymax: maxE, yticks: [0, 20, 40, 60].filter(v => v <= maxE && v >= minE), label: 'Émissions de CO₂' })}</figure>
+        <figure><figcaption>Stabilité sociale moyenne</figcaption>${courbe({ series: [{ pts: serie('S'), coul: 'var(--manque)' }], ymin: 0, ymax: 100, yticks: [0, 50, 100], label: 'Stabilité sociale moyenne' })}</figure>
+      </div>
+      <h3 class="titre-section">Journal</h3>
+      <ul class="entrees">${[...st.journal].reverse().map(entreeHTML).join('')}</ul>`;
+  }
+
+  // ---------- Onglets ----------
+  function majOnglets() {
+    for (const b of $$('.onglets [role="tab"]')) {
+      const actif = b.dataset.o === onglet;
+      b.setAttribute('aria-selected', actif);
+      b.tabIndex = actif ? 0 : -1;
+      $(`#p-${b.dataset.o}`).hidden = !actif;
+    }
+    const t = $('#t-journal');
+    t.innerHTML = `Journal${nonLus ? `<span class="pastille-notif" aria-label="${nonLus} nouveaux">${nonLus}</span>` : ''}`;
+  }
+  function choisirOnglet(o) {
+    onglet = o;
+    if (o === 'journal') nonLus = 0;
+    majOnglets();
+  }
+
+  // ---------- Dialogues ----------
+  function ouvrirIntro() {
+    const enCours = st.tour > 0 && !st.fini;
+    $('#intro-actions').innerHTML = enCours
+      ? `<button type="button" class="avancer-principal" data-act="continuer">Reprendre la partie (${st.year})</button>
+         <button type="button" class="secondaire" data-act="nouvelle">Nouvelle partie</button>`
+      : `<button type="button" class="avancer-principal" data-act="continuer">Commencer la partie</button>`;
+    const d = $('#d-intro');
+    if (!d.open) d.showModal();
+  }
+
+  function ouvrirRecap(nouveaux) {
+    const h = st.hist, a = h[h.length - 1], b = h[Math.max(0, h.length - 1 - A.PAS)];
+    const d = (k, v, mal, txt) => `<div><dt>${k}</dt><dd class="${mal === null ? '' : mal ? 'mal' : 'bien'}">${txt}</dd></div>`;
+    const dT = a.T - b.T, dE = a.em - b.em, dS = a.S - b.S, dP = a.pop - b.pop;
+    $('#recap-titre').textContent = `${b.a} → ${a.a}`;
+    $('#recap-corps').innerHTML = `
+      <dl class="deltas">
+        ${d('Réchauffement', dT, dT > 0.005, `${signe(dT, 2)}${NB}°C`)}
+        ${d('Émissions', dE, dE > 0, `${signe(dE, 1)}${NB}Gt/an`)}
+        ${d('Population', dP, null, `${signe(dP, 0)}${NB}M`)}
+        ${d('Stabilité', dS, dS < -0.5, `${signe(dS, 0)}`)}
+        ${d('Capital pour la suite', 0, null, `${st.budget}`)}
+      </dl>
+      <ul class="entrees">${nouveaux.length ? nouveaux.map(entreeHTML).join('') : '<li class="entree"><p class="texte">Cinq années sans événement majeur.</p></li>'}</ul>`;
+    $('#recap-ok').textContent = `Choisir mes politiques pour ${st.year}–${st.year + 5}`;
+    $('#d-recap').showModal();
+  }
+
+  const ISSUES = {
+    donut: ['Atterrissage réussi', 'Le monde est entré dans le donut : réchauffement contenu sous 2 °C, aucune société en crise, besoins essentiels couverts pour la grande majorité. Certaines limites restent franchies, l’effort doit continuer.'],
+    descente: ['Descente maîtrisée', 'Le pire a été évité : les sociétés ont tenu et le réchauffement a été freiné. Mais le monde reste hors du donut, avec des dommages qui dureront des siècles.'],
+    declin: ['Déclin chaotique', 'Crises à répétition, ressources épuisées, climat déréglé : le monde de 2100 est plus pauvre et plus fragile, sans s’être effondré partout.'],
+    effondrement: ['Effondrement', 'Plusieurs grandes régions ont basculé dans la crise. Les émissions ont fini par baisser, mais parce que les économies se sont effondrées. C’est le scénario que redoutent les collapsologues.'],
+  };
+  function ouvrirFin() {
+    const b = st.bilan, [titre, texte] = ISSUES[b.issue];
+    $('#fin-titre').textContent = titre;
+    $('#fin-corps').innerHTML = `
+      <p class="fin-issue">${texte}</p>
+      <dl class="deltas">
+        <div><dt>Réchauffement en 2100</dt><dd>${deg(b.T)}</dd></div>
+        <div><dt>Scénario du GIEC le plus proche</dt><dd>${b.ssp}</dd></div>
+        <div><dt>Limites franchies</dt><dd>${b.franchies} sur 9</dd></div>
+        <div><dt>Points de bascule</dt><dd>${b.bascules} sur 7</dd></div>
+        <div><dt>Crises régionales</dt><dd>${b.crisesTotales}</dd></div>
+        <div><dt>Sous le plancher social</dt><dd>${pct(b.sous)}</dd></div>
+        <div><dt>Hausse des mers</dt><dd>+${fr(b.mer * 100, 0)}${NB}cm</dd></div>
+      </dl>
+      <figure>${courbeTemperature(560, 220)}<figcaption>Votre réchauffement (trait plein) et les scénarios du GIEC (valeurs centrales approximatives, moyenne 2081-2100 placée en 2090).</figcaption></figure>
+      <p class="graine">Partie n°${st.seed}. Pour rejouer exactement la même partie, ajoutez #s${st.seed} à la fin de l’adresse de la page.</p>`;
+    $('#d-fin').showModal();
+  }
+
+  // ---------- Actions ----------
+  function nouvellePartie(graine) {
+    st = A.nouvellePartie(graine || graineAdresse() || nouvelleGraine());
+    zoneFixe = null; nonLus = 0; onglet = 'politiques';
+    sauver(); rendre();
+  }
+  function avancer() {
+    if (st.fini) { ouvrirFin(); return; }
+    const res = A.avancer(st);
+    if (res.erreur) return;
+    nonLus += res.nouveaux.length;
+    if (onglet === 'journal') nonLus = 0;
+    sauver(); rendre();
+    if (st.fini) ouvrirFin(); else ouvrirRecap(res.nouveaux);
+  }
+
+  function brancher() {
+    for (const b of $$('.avancer')) b.addEventListener('click', avancer);
+    for (const b of $$('.lien-aide')) b.addEventListener('click', ouvrirIntro);
+    $('#intro-actions').addEventListener('click', e => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      if (act === 'nouvelle') nouvellePartie(nouvelleGraine());
+      $('#d-intro').close(); sauver();
+    });
+    $('#recap-ok').addEventListener('click', () => $('#d-recap').close());
+    $('#fin-rejouer').addEventListener('click', () => { $('#d-fin').close(); history.replaceState(null, '', location.pathname + location.search); nouvellePartie(nouvelleGraine()); });
+    $('#fin-meme').addEventListener('click', () => { $('#d-fin').close(); nouvellePartie(st.seed); });
+    $('#fin-fermer').addEventListener('click', () => $('#d-fin').close());
+
+    $('#p-politiques').addEventListener('click', e => {
+      const b = e.target.closest('button[data-l]');
+      if (!b || b.disabled) return;
+      st.leviers[b.dataset.l] = +b.dataset.n;
+      sauver();
+      rendrePolitiques(); rendreEntete();
+      $(`button[data-l="${b.dataset.l}"][data-n="${b.dataset.n}"]`)?.focus();
+    });
+
+    const reg = $('#p-regions');
+    reg.addEventListener('click', e => {
+      const m = e.target.closest('button[data-m]');
+      if (m) { metrique = m.dataset.m; rendreRegions(); $(`button[data-m="${metrique}"]`)?.focus(); return; }
+      const r = e.target.closest('[data-r]');
+      if (r) { regionSel = r.dataset.r; rendreRegions(); $(`[data-r="${regionSel}"]`)?.focus(); }
+    });
+    reg.addEventListener('keydown', e => {
+      const r = e.target.closest('[data-r]');
+      if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); regionSel = r.dataset.r; rendreRegions(); $(`[data-r="${regionSel}"]`)?.focus(); }
+    });
+
+    const don = $('#donut');
+    don.addEventListener('pointerover', e => { const z = e.target.closest('.zone'); if (z) majDetail(z.dataset.z); });
+    don.addEventListener('pointerleave', () => majDetail(zoneFixe));
+    don.addEventListener('focusin', e => { const z = e.target.closest('.zone'); if (z) majDetail(z.dataset.z); });
+    don.addEventListener('focusout', () => majDetail(zoneFixe));
+    don.addEventListener('click', e => {
+      const z = e.target.closest('.zone');
+      zoneFixe = z ? (zoneFixe === z.dataset.z ? null : z.dataset.z) : null;
+      majDetail(zoneFixe);
+    });
+    don.addEventListener('keydown', e => {
+      const z = e.target.closest('.zone');
+      if (z && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); zoneFixe = z.dataset.z; majDetail(zoneFixe); }
+    });
+
+    const tabs = $('.onglets');
+    tabs.addEventListener('click', e => { const t = e.target.closest('[role="tab"]'); if (t) choisirOnglet(t.dataset.o); });
+    tabs.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const l = $$('.onglets [role="tab"]'), i = l.findIndex(t => t.dataset.o === onglet);
+      const n = l[(i + (e.key === 'ArrowRight' ? 1 : l.length - 1)) % l.length];
+      choisirOnglet(n.dataset.o); n.focus();
+    });
+  }
+
+  function init() {
+    const sauve = charger(), graine = graineAdresse();
+    if (sauve && !sauve.fini && (!graine || graine === sauve.seed)) st = sauve;
+    else st = A.nouvellePartie(graine || nouvelleGraine());
+    brancher(); rendre(); ouvrirIntro();
+  }
+  init();
+})();
+
+</script>
+</body>
+</html>
