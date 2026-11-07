@@ -2,11 +2,15 @@
 
 **Atterrir** — un jeu sur la collapsologie et les limites planétaires.
 
-De 2025 à 2100, guidez le monde vers le « donut » : sous le plafond écologique des neuf limites
-planétaires, au-dessus du plancher social. Le temps s'écoule **en continu** et vous réglez neuf
-politiques (énergies bas-carbone, sobriété, protection sociale, forêts, agroécologie, pêche,
-économie circulaire, solidarité…) pendant que le monde évolue : six régions, ressources finies
-(pétrole, métaux, poissons), points de bascule climatiques aux seuils cachés et incertains.
+De 2025 à 2100, guidez le monde vers le « donut » de Kate Raworth : sous le plafond écologique des neuf
+limites planétaires, au-dessus du plancher social de douze dimensions. Le temps s'écoule **en continu** et
+vous réglez douze politiques (énergies bas-carbone, efficacité, sobriété, protection sociale, forêts,
+agroécologie, pêche, économie circulaire, solidarité, santé et éducation, eau, air et chimie) pendant que le
+monde évolue : six régions, climat et cycle du carbone, terres et alimentation, ressources finies (pétrole,
+métaux, poissons, nappes), points de bascule aux seuils cachés et incertains.
+
+Les interactions visent le réalisme plutôt que l'équilibre du jeu : aucun pays n'est dans le donut
+aujourd'hui, et le rejoindre d'ici 2100 est presque impossible. On peut en revanche en prendre le chemin.
 
 ## Lancer le jeu
 
@@ -45,31 +49,88 @@ avec sa légende, son auteur, sa licence et un lien vers sa source. Il y en a 48
 (voir « Crédits des images » plus bas). Elles se déclarent dans `js/photos.js` (le format y est expliqué) et se
 placent dans `img/evenements/` ; pour un type d'événement sans image, la fiche s'affiche sans illustration.
 
+## Le modèle
+
+Chaque année, le moteur enchaîne : économie et énergie → ressources → alimentation et sols → système Terre
+→ points de bascule → plancher social → stabilité → société → migrations → événements.
+
+- **Climat** (`js/terre.js`) : cycle du carbone à quatre réservoirs (FaIR, Millar et al., 2017) dont les puits
+  s'affaiblissent avec le réchauffement ; méthane, protoxyde d'azote, aérosols et autres forçages ; température à
+  deux couches (surface et océan profond, sensibilité ~3 °C). Avec des émissions de type SSP1-2.6, SSP2-4.5 et
+  SSP3-7.0, il donne 1,9, 2,8 et 4,0 °C en 2100 (GIEC AR6 : 1,8, 2,7 et 3,6 en 2081-2100).
+- **Limites planétaires** : les variables de contrôle du bilan de santé planétaire 2025 et de Richardson et al.
+  (2023) — CO₂ et forçage, extinctions et production primaire appropriée, forêts, eau bleue et verte, azote et
+  phosphore, Ω aragonite, entités nouvelles, aérosols, ozone. En 2025, 7 sur 9 sont franchies.
+- **Alimentation et sols** (`js/alimentation.js`) : la demande (population, revenus, régimes, gaspillage) fixe
+  les surfaces cultivées et pâturées, et donc la déforestation. Les rendements dépendent des engrais azotés (donc
+  du gaz fossile), des nappes qui s'épuisent, des pollinisateurs, du climat, du CO₂ et de l'état des sols.
+- **Plancher social** (`js/donut.js`) : les 12 dimensions de Raworth, en part de la population en manque par
+  région. La sous-nutrition suit la méthode de la FAO (calories log-normales), la pauvreté un seuil de 6,85 $/jour.
+  L'espérance de vie dépend de la nourriture, de l'eau, de la pollution de l'air, de la chaleur, des épidémies et
+  des guerres ; la fécondité baisse plus vite avec l'éducation et la santé.
+- **Économie** : identité de Kaya pour les émissions ; dommages climatiques sur le niveau du PIB et sur sa
+  croissance ; la santé et l'éducation soutiennent la productivité.
+- **Stabilité** : pas de retour automatique à la normale. Elle tend vers un niveau fixé par les conditions de vie
+  (manques du donut, inégalités, démocratie, guerres, pénuries, croissance), comparées à 2025.
+
+**Fin de partie** : bilan chiffré à la manière de Fanning et Raworth (Nature, 2025). Le *dépassement écologique*
+est l'écart moyen des 9 limites à leur seuil (plafonné à 300 % par limite) ; le *manque social* est la part moyenne
+de la population en manque sur les 12 dimensions. Le *donut* demande moins de 5 % de manque et 10 % de
+dépassement. La *descente maîtrisée* demande un manque réduit d'au moins 20 %, un dépassement qui a passé son pic,
+au plus +2,5 °C et aucune région en crise.
+
+**Calage** : `node outils/calage.js [graines]` compare les valeurs de 2025 aux sources, montre la trajectoire sans
+nouvelle politique et les issues selon plusieurs stratégies. Sur 20 graines :
+
+| Stratégie | Réchauffement 2100 | Manque social 2100 | Issues |
+|---|---|---|---|
+| Aucune politique | +3,0 °C | 32 % | 16 déclins, 4 effondrements |
+| Tous les leviers au niveau 1 | +2,6 °C | 13 % | 20 déclins |
+| Transition sociale et écologique | +2,3 °C | 8 % | 13 descentes maîtrisées, 7 déclins |
+
+En 2025 : manque social 32 %, dépassement écologique 100 %.
+
+### Sources des valeurs de 2025
+
+Global Carbon Budget 2025 (CO₂, émissions, puits) ; Forster et al. 2025, *Indicators of Global Climate Change 2024*
+(réchauffement d'origine humaine 1,36 °C, budget de 130 Gt CO₂ pour 1,5 °C) ; bilan de santé planétaire 2025 (PIK,
+Stockholm Resilience Centre : forçage +2,97 W/m², Ω 2,84, 7 limites sur 9) ; Richardson et al. 2023 (eau bleue et
+verte, azote, phosphore, extinctions, production primaire) ; FAO SOFI 2025 (sous-nutrition 8,2 %) ; ONU WPP 2024
+(population, espérance de vie 73,3 ans, pic de 10,3 milliards vers 2084) ; rapport ODD 2025 (eau, assainissement,
+internet) ; Tracking SDG7 2025 (électricité, cuisson propre) ; ONU-Habitat (bidonvilles) ; OMS (pollution de l'air) ;
+Zhao et al. 2017 (rendements et climat) ; Aizen et al. 2009 (pollinisateurs) ; Raworth 2017 et Fanning et Raworth
+2025 (donut). Les valeurs régionales sont des agrégats approximatifs. Certaines valeurs (aérosols, ozone, part des
+nappes non renouvelables, coefficients d'interaction) sont des ordres de grandeur à affiner : elles sont signalées
+en tête de chaque module.
+
 ## Structure
 
 - `index.html` : la page (structure et boîtes de dialogue)
 - `css/style.css` : styles, thèmes clair et sombre, mise en page mobile
-- `js/moteur.js` : moteur de simulation (climat, énergie, ressources, événements), sans dépendance au DOM
-- `js/societe.js` : module société (inégalités, démocratie, tensions, guerres, famines, épidémies, révoltes)
-- `js/migrations.js` : module migrations (déplacés climatiques, de guerre et de faim ; flux entre régions ; accueil et fermeture des frontières)
+- `js/moteur.js` : moteur (économie, énergie, ressources, stabilité, événements, temps, bilan), sans dépendance au DOM
+- `js/terre.js` : système Terre (carbone, gaz, forçage, température, mer) et les 9 limites planétaires
+- `js/alimentation.js` : terres, rendements, régimes, eau d'irrigation, azote et phosphore, biodiversité
+- `js/societe.js` : société (inégalités, démocratie, tensions, guerres, famines, épidémies, révoltes)
+- `js/donut.js` : plancher social à 12 dimensions, santé, éducation, démographie
+- `js/migrations.js` : migrations (déplacés climatiques, de guerre et de faim ; flux entre régions ; frontières)
 - `js/carte.js` : contours simplifiés des régions pour la carte
-- `js/photos.js` : banque de photos d'illustration des événements (`img/evenements/`)
-- `js/panneaux.js` : panneaux Société, Population et Événements, et fiche de détail d'un événement (HTML généré à partir de l'état)
+- `js/photos.js` : banque d'images d'illustration des événements (`img/evenements/`)
+- `js/panneaux.js` : panneaux Société, Population et Événements, et fiche de détail d'un événement
 - `js/interface.js` : interface (donut, onglets, horloge, dialogues, actions)
+- `outils/calage.js` : script de calage (Node, sans dépendance)
 
-Les scripts se chargent dans cet ordre. Le moteur et le module société fonctionnent aussi sous Node :
-`require('./js/moteur.js'); require('./js/societe.js'); require('./js/migrations.js')`.
+Les scripts se chargent dans cet ordre (voir `index.html`). Le moteur fonctionne aussi sous Node : voir
+`outils/calage.js`.
 
 ## Statut
 
-Prototype. Les chiffres de départ sont des ordres de grandeur arrondis (~2024) et le modèle est
-volontairement simplifié, en particulier pour les guerres, les épidémies, les révolutions et les migrations.
+Prototype. Les mécanismes sont simplifiés, en particulier pour les guerres, les épidémies, les révolutions et les
+migrations, et les coefficients d'interaction sont des hypothèses raisonnables plutôt que des estimations.
 
 Les déplacés climatiques sont un résultat du modèle, pas une donnée d'entrée : ils dépendent des dommages
 climatiques subis par chaque région et de l'adaptation. À +2 °C, le jeu donne quelques dizaines à quelques
 centaines de millions de déplacés d'ici 2050, dans l'ordre de grandeur de la Banque mondiale (Groundswell, 2021 :
-jusqu'à 216 millions de migrants climatiques internes en 2050). Le réchauffement du jeu plafonne autour de +2,8 °C :
-atteindre plusieurs milliards de déplacés demanderait un monde plus chaud.
+jusqu'à 216 millions de migrants climatiques internes en 2050).
 
 ## Crédits des images
 

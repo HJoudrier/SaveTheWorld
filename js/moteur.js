@@ -1,7 +1,12 @@
 // =====================================================================
 //  ATTERRIR — moteur de simulation (aucune dépendance au DOM)
-//  Ordres de grandeur arrondis (~2024), à remplacer par des séries sourcées
-//  (Our World in Data, Global Carbon Budget, USGS, FAO, PIK…).
+//  Le moteur porte l'économie, l'énergie, les ressources, la stabilité, les événements
+//  et l'écoulement du temps. Chaque année, il appelle les étapes dans cet ordre :
+//    économie et énergie → ressources → alimentation et sols (js/alimentation.js)
+//    → système Terre et limites planétaires (js/terre.js) → points de bascule
+//    → plancher social du donut (js/donut.js) → stabilité → société (js/societe.js)
+//    → migrations (js/migrations.js) → événements → capital politique.
+//  Ordres de grandeur arrondis (~2024) ; sources détaillées en tête de chaque module.
 // =====================================================================
 const Atterrir = (() => {
   'use strict';
@@ -22,17 +27,17 @@ const Atterrir = (() => {
   // pop : millions ; y : PIB/hab ($ PPA) ; gpc : énergie primaire (GJ/hab)
   // co2 : Gt CO2 fossile/an ; s : part bas-carbone de l'énergie ; hist : part du cumul historique
   const REGIONS = [
-    { id: 'nam', nom: 'Amérique du Nord', pop: 610, y: 48000, gpc: 195, co2: 6.1, s: 0.20, hist: 0.27, S0: 58,
+    { id: 'nam', nom: 'Amérique du Nord', pop: 610, y: 48000, gpc: 195, co2: 6.1, s: 0.20, hist: 0.27, S0: 58, aer: 0.5,
       gP0: 0.006, gPf: -0.001, kP: 0.03, gY0: 0.016, gYf: 0.010, vuln: 0.8, cote: 0.8 },
-    { id: 'sam', nom: 'Amérique du Sud', pop: 440, y: 16000, gpc: 60, co2: 1.1, s: 0.33, hist: 0.03, S0: 50,
+    { id: 'sam', nom: 'Amérique du Sud', pop: 440, y: 16000, gpc: 60, co2: 1.1, s: 0.33, hist: 0.03, S0: 50, aer: 0.8,
       gP0: 0.006, gPf: -0.006, kP: 0.03, gY0: 0.022, gYf: 0.012, vuln: 1.2, cote: 0.8 },
-    { id: 'eur', nom: 'Europe (avec la Russie)', court: 'Europe', pop: 745, y: 38000, gpc: 135, co2: 4.9, s: 0.28, hist: 0.31, S0: 60,
+    { id: 'eur', nom: 'Europe (avec la Russie)', court: 'Europe', pop: 745, y: 38000, gpc: 135, co2: 4.9, s: 0.28, hist: 0.31, S0: 60, aer: 0.7,
       gP0: -0.001, gPf: -0.004, kP: 0.03, gY0: 0.013, gYf: 0.009, vuln: 0.7, cote: 0.7 },
-    { id: 'afr', nom: 'Afrique', pop: 1500, y: 5500, gpc: 16, co2: 1.45, s: 0.10, hist: 0.03, S0: 46,
+    { id: 'afr', nom: 'Afrique', pop: 1500, y: 5500, gpc: 16, co2: 1.45, s: 0.10, hist: 0.03, S0: 46, aer: 1.3,
       gP0: 0.023, gPf: -0.002, kP: 0.018, gY0: 0.032, gYf: 0.015, vuln: 1.8, cote: 1.0 },
-    { id: 'asi', nom: 'Asie', pop: 4800, y: 17000, gpc: 70, co2: 22.3, s: 0.15, hist: 0.33, S0: 62,
+    { id: 'asi', nom: 'Asie', pop: 4800, y: 17000, gpc: 70, co2: 22.3, s: 0.15, hist: 0.33, S0: 62, aer: 1.6,
       gP0: 0.006, gPf: -0.005, kP: 0.03, gY0: 0.030, gYf: 0.010, vuln: 1.3, cote: 1.5 },
-    { id: 'oce', nom: 'Océanie', pop: 46, y: 42000, gpc: 180, co2: 0.45, s: 0.15, hist: 0.013, S0: 64,
+    { id: 'oce', nom: 'Océanie', pop: 46, y: 42000, gpc: 180, co2: 0.45, s: 0.15, hist: 0.013, S0: 64, aer: 0.8,
       gP0: 0.011, gPf: 0.001, kP: 0.03, gY0: 0.015, gYf: 0.010, vuln: 1.0, cote: 1.0 },
   ];
   const PARAM = Object.fromEntries(REGIONS.map(r => [r.id, r]));
@@ -71,6 +76,15 @@ const Atterrir = (() => {
     { id: 'solidarite', nom: 'Solidarité et adaptation', sphere: 'anthropo',
       effet: 'Finance l’adaptation, la transition et l’accueil des déplacés dans les régions vulnérables.',
       revers: 'Un peu moins de croissance et de stabilité dans les régions riches.' },
+    { id: 'sante', nom: 'Santé et éducation publiques', sphere: 'anthropo',
+      effet: 'Soins de base, vaccination, écoles : l’espérance de vie et la scolarisation progressent, la fécondité baisse plus vite.',
+      revers: 'Effets lents : il faut une génération pour qu’ils se voient pleinement.' },
+    { id: 'eau', nom: 'Gestion de l’eau', sphere: 'hydro',
+      effet: 'Irrigation goutte-à-goutte, recharge des nappes, réseaux d’eau potable et d’assainissement.',
+      revers: 'Investissements lourds ; ne crée pas d’eau là où il ne pleut plus.' },
+    { id: 'air', nom: 'Air et chimie', sphere: 'litho',
+      effet: 'Sortie du charbon, filtres sur les usines et les véhicules, interdiction des substances les plus toxiques.',
+      revers: 'Moins d’aérosols : la pollution de l’air tue moins, mais leur effet refroidissant disparaît, donc le climat se réchauffe un peu plus vite à court terme.' },
   ];
 
   // --- Points de bascule (plages d'après Armstrong McKay et al., 2022) -----
@@ -91,35 +105,11 @@ const Atterrir = (() => {
       effet: 'Les forêts du Grand Nord dépérissent et brûlent : +1 Gt de CO₂ par an.' },
   ];
 
-  // --- Limites planétaires : ratio = 1 à la limite, hr = début de la zone à haut risque
-  const LIMITES = [
-    { id: 'climat', nom: 'Changement climatique', court: 'Climat', hr: (450 - 280) / 70,
-      ratio: g => (g.ppm - 280) / 70, val: g => `${Math.round(g.ppm)} ppm de CO₂`, seuil: 'limite : 350 ppm' },
-    { id: 'biosphere', nom: 'Intégrité de la biosphère', court: 'Biosphère', hr: 2,
-      ratio: g => (100 - g.bii) / 10, val: g => `${fr(g.bii, 1)} % d’intégrité`, seuil: 'limite : 90 %' },
-    { id: 'sols', nom: 'Usage des sols', court: 'Forêts', hr: 46 / 25,
-      ratio: g => (100 - g.foret) / 25, val: g => `${fr(g.foret, 1)} % du couvert forestier d’origine`, seuil: 'limite : 75 %' },
-    { id: 'eau', nom: 'Eau douce', court: 'Eau douce', hr: 2,
-      ratio: g => g.eau, val: g => `indice ${fr(g.eau, 2)}`, seuil: 'limite : 1' },
-    { id: 'azote', nom: 'Azote et phosphore', court: 'Engrais', hr: 200 / 62,
-      ratio: g => g.azote / 62, val: g => `${Math.round(g.azote)} Mt d’azote par an`, seuil: 'limite : 62 Mt' },
-    { id: 'acid', nom: 'Acidification des océans', court: 'Acidité', hr: 2,
-      ratio: g => (3.44 - g.omega) / 0.69, val: g => `Ω aragonite ${fr(g.omega, 2)}`, seuil: 'limite : 2,75' },
-    { id: 'nouvelles', nom: 'Entités nouvelles', court: 'Pollutions', hr: 2.5,
-      ratio: g => g.nouvelles, val: g => `indice ${fr(g.nouvelles, 2)} (plastiques, chimie)`, seuil: 'limite : 1' },
-    { id: 'aerosols', nom: 'Aérosols atmosphériques', court: 'Aérosols', hr: 2,
-      ratio: g => g.aerosols, val: g => `indice ${fr(g.aerosols, 2)}`, seuil: 'limite : 1' },
-    { id: 'ozone', nom: 'Couche d’ozone', court: 'Ozone', hr: 2,
-      ratio: g => g.ozone, val: g => `indice ${fr(g.ozone, 2)} (en reconstitution)`, seuil: 'limite : 1' },
-  ];
-
-  // --- Plancher social -------------------------------------------------------
-  const PLANCHERS = [
-    { id: 'revenu', court: 'Revenu', nom: 'Revenu', val: r => r.yEff / 12000, seuil: '12 000 $/hab.' },
-    { id: 'alim', court: 'Alimentation', nom: 'Alimentation', val: r => r.food, seuil: 'indice 1' },
-    { id: 'energie', court: 'Énergie', nom: 'Accès à l’énergie', val: r => servicesEnergie(r) / 30, seuil: '30 GJ/hab.' },
-    { id: 'stab', court: 'Stabilité', nom: 'Stabilité sociale', val: r => r.S / 45, seuil: '45/100' },
-  ];
+  // --- Limites planétaires et plancher social : définis par js/terre.js et js/donut.js
+  // Limite : { id, nom, court, desc, ratio(g) (1 = limite, 2 = haut risque), depassement(g), val(g), seuil, controles }
+  // Plancher : { id, nom, court, desc, seuil, part(r) (part de la population de la région en manque, 0 à 1), valeur(r) }
+  const LIMITES = [];
+  const PLANCHERS = [];
 
   // Scénarios du GIEC (AR6, valeurs centrales approximatives, °C vs 1850-1900)
   const SSP = [
@@ -146,6 +136,17 @@ const Atterrir = (() => {
     const u = alea(st), f = (c - a) / (b - a);
     return u < f ? a + Math.sqrt(u * (b - a) * (c - a)) : b - Math.sqrt((1 - u) * (b - a) * (b - c));
   }
+  // Fonction de répartition de la loi normale (Abramowitz et Stegun 7.1.26) et sa réciproque
+  function phi(x) {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x / 2);
+    return x >= 0 ? 0.5 * (1 + y) : 0.5 * (1 - y);
+  }
+  function phiInv(p) {
+    let lo = -8, hi = 8;
+    for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (phi(m) < p) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
   function energieParHab(r) { return r.E / r.pop * 1000; }    // GJ/hab.
   // Services énergétiques : énergie par habitant exprimée à l'efficacité de 2025
   function servicesEnergie(r) { return energieParHab(r) * (r.ei0 || r.ei) / r.ei; }
@@ -162,7 +163,7 @@ const Atterrir = (() => {
   function nouvellePartie(seed) {
     seed = (seed >>> 0) || 1;
     const st = {
-      version: 2, seed, rng: seed, t: ANNEE_DEBUT, year: ANNEE_DEBUT, fini: false, pret: false, calcul: false, prec: null,
+      version: 3, seed, rng: seed, t: ANNEE_DEBUT, year: ANNEE_DEBUT, fini: false, pret: false, calcul: false, prec: null,
       leviers: {}, prochaine: {}, acquis: {}, bonus: [], journal: [], pendants: [], hist: [], flags: {}, regions: [], bascules: [], g: {},
       actifs: { guerres: [], famines: [], epidemies: [] }, stats: {},
       morts: { guerre: 0, famine: 0, epidemie: 0, climat: 0 },
@@ -173,82 +174,64 @@ const Atterrir = (() => {
     }
     const g = st.g;
     Object.assign(g, {
-      cum: 2650, T: 1.37, nonCO2: 0.18, mer: 0.23, ppm: 0, omega: 0,
-      petrole0: 10200, petrole: 10200, eroi: 18, prodPetrole: 0, penuriePetrole: 0,
+      T: 1.37, petrole0: 10200, petrole: 10200, eroi: 18, prodPetrole: 0, penuriePetrole: 0,
       metaux0: 150, metaux: 150, demMetaux: 1, penurieMetaux: 0,
-      poissons: 420, K: 1000, effortBAU: 0.214, prises: 90,
-      foret: 60, bii: 76, azote: 205, eau: 1.44, nouvelles: 1.5, aerosols: 0.7, ozone: 0.55,
-      rendement: 1, luc: 4.0, chocPIB: 0, chocAlim: 0, bonusTech: 0, co2Evt: 0,
-      rebond: 0.45, banquise: 0.5, tauxMer: 3.6, phi: 1.12,
+      poissons: 420, K: 1000, effortBAU: 0.214, prises: 90, zonesMortes: 1,
+      chocPIB: 0, chocAlim: 0, bonusTech: 0, co2Evt: 0, rebond: 0.45,
     });
-    let totE = 0, totFoss = 0, LC = 0, gdp = 0, co2 = 0;
+    let totE = 0, totFoss = 0, LC = 0, gdp = 0, co2 = 0, aer = 0, aerNord = 0;
     for (const d of REGIONS) {
       const E = d.pop * d.gpc / 1000;                               // EJ
       const r = {
-        id: d.id, nom: d.nom, court: d.court || d.nom, pop: d.pop, gP: d.gP0, s: d.s, S: d.S0,
-        food: 1, crise: false, nbCrises: 0, cumCO2: d.hist * 1800, dmgEvt: 0,
+        id: d.id, nom: d.nom, court: d.court || d.nom, pop: d.pop, gP: d.gP0, s: d.s, S: d.S0, S0: d.S0, gRef: d.gY0,
+        food: 1, crise: false, nbCrises: 0, cumCO2: d.hist * 1800, dmgEvt: 0, aer: d.aer,
         ei: E / (d.pop * d.y), ei0: E / (d.pop * d.y), fc: d.co2 / (E * (1 - d.s)), E, co2: d.co2, yEff: d.y, gEff: d.gY0,
       };
       const dmg0 = d.vuln * 0.012 * Math.max(0, g.T - 0.8) ** 2;
       r.dmg = dmg0; r.yPot = d.y / (1 - dmg0);
       st.regions.push(r);
-      totE += E; totFoss += E * (1 - d.s); LC += E * d.s; gdp += d.pop * d.y; co2 += d.co2;
+      const foss = E * (1 - d.s);
+      totE += E; totFoss += foss; LC += E * d.s; gdp += d.pop * d.y; co2 += d.co2;
+      aer += foss * d.aer; aerNord += foss * d.aer * POIDS_NORD[d.id];
     }
-    g.foss0 = totFoss; g.pib0 = gdp; g.LCprec = LC; g.ajoutLC0 = 4.5;
-    g.emissions = co2 * 1.033 + g.luc; g.prodPetrole = totFoss * 0.38;
-    g.prod0 = 1 - 0.06 * Math.pow(Math.max(0, g.T - 1.2), 1.4);
-    g.prod = g.prod0;
-    let dem = 0;
-    for (const r of st.regions) { r.regime = 0.85 + 0.1 * Math.log(r.yEff / 5000 + 1); dem += r.pop * r.regime; }
-    g.demNorm = g.prod0 / (dem * 1.12);
-    g.phi = 1.12;
-    for (const r of st.regions) r.food = g.phi * acces(r, st.leviers);
+    Object.assign(g, {
+      foss0: totFoss, pib0: gdp, LCprec: LC, ajoutLC0: 4.5, prodPetrole: totFoss * 0.38, aer0: aer, aerNord0: aerNord,
+      pibIdx: 1, combustion: 1, aerosolsIdx: 1, aerosolsNordIdx: 1, co2Fossile: co2 * 1.033,
+      ch4Fossile: 125, n2oAutre: 1.8,
+    });
     for (const m of modules) if (m.init) m.init(st, OUTILS);
-    derive(st);
     st.budget = calculerBudget(st);
     st.hist.push(instantane(st));
     journaliser(st, 'debut', 'Le monde en 2025',
-      'Sept des neuf limites planétaires sont déjà franchies. Le climat s’est réchauffé d’environ 1,4 °C. La population et l’économie continuent de croître.',
-      'Vous avez 75 ans pour faire entrer le monde dans le donut : sous le plafond écologique, au-dessus du plancher social. Le temps s’écoule : à vitesse normale, une minute vaut une année.', null);
+      'Sept des neuf limites planétaires sont franchies (bilan de santé planétaire 2025). Le climat s’est réchauffé d’environ 1,4 °C. Près de 700 millions de personnes ont faim, 2,2 milliards n’ont pas d’eau potable sûre, et la population comme l’économie continuent de croître.',
+      'Vous avez 75 ans pour faire entrer le monde dans le donut : sous le plafond écologique, au-dessus du plancher social. Aucun pays n’y parvient aujourd’hui. Le temps s’écoule : à vitesse normale, une minute vaut une année.', null);
     liberer(st, []);
     return st;
   }
 
-  function acces(r, L) {
-    return clamp(0.78 + 0.075 * Math.log(r.yEff / 2000), 0.55, 1.1) + (r.yEff < SEUIL_RICHE ? 0.02 * L.solidarite : 0);
-  }
-
-  function derive(st) {
-    const g = st.g;
-    g.ppm = 280 + 0.435 * g.cum / 7.81;
-    g.omega = 3.44 - 0.0048 * (g.ppm - 280);
-    g.acid = (3.44 - g.omega) / 0.69;
-    g.banquise = clamp(1 - (g.T - 0.6) / 1.5, 0, 1);
-  }
-
-  // --- Une année de simulation ---------------------------------------------
-  function stepAnnee(st) {
+  // --- Économie et énergie ----------------------------------------------------------
+  // Part des émissions d'aérosols de chaque région qui pèse sur la différence entre hémisphères
+  const POIDS_NORD = { nam: 1, eur: 1, asi: 1, afr: 0.5, sam: 0, oce: 0 };
+  function economie(st) {
     const L = st.leviers, g = st.g, t = st.year - ANNEE_DEBUT;
     const rebond = Math.max(0, 0.45 - 0.12 * L.sobriete);
     g.rebond = rebond;
-    let totE = 0, totFoss = 0, co2Reg = 0, LC = 0, gdp = 0;
-
+    let totE = 0, totFoss = 0, co2Reg = 0, LC = 0, gdp = 0, aer = 0, aerNord = 0;
     for (const r of st.regions) {
       const P = PARAM[r.id];
       const riche = r.yEff > SEUIL_RICHE;
       const fc = r.crise ? 0.5 : 1;
-      // Démographie : transition plus rapide avec l'éducation et la solidarité
-      const kP = P.kP * (1 + (riche ? 0 : 0.15 * L.solidarite));
-      r.gP += kP * (P.gPf - r.gP);
-      let gP = r.gP;
-      if (r.food < 0.92) gP -= 0.03 * (0.92 - r.food);
-      if (r.crise) gP -= 0.003;
-      r.pop *= 1 + gP;
       // Croissance économique potentielle
       let gY = P.gYf + (P.gY0 - P.gYf) * Math.exp(-0.02 * t);
       if (riche) gY -= 0.006 * L.sobriete * fc;
       gY += riche ? -0.001 * L.solidarite : 0.002 * L.solidarite;
       gY += 0.004 * L.efficacite * rebond;
+      // Capital humain : la santé et l'éducation (js/donut.js) soutiennent la productivité
+      if (r.edu0 !== undefined) gY += 0.04 * (r.edu - r.edu0) + 0.0004 * (r.LE - r.LE0);
+      // Dommages climatiques sur la croissance elle-même (et pas seulement sur le niveau du PIB) :
+      // ils s'accumulent d'année en année, surtout dans les régions chaudes et pauvres (Burke et al., 2015)
+      const adapt = clamp((riche ? 0.08 : 0.02) + 0.1 * L.solidarite * (riche ? 0.5 : 1.3), 0, 0.6);
+      gY -= 0.003 * P.vuln * Math.max(0, g.T - 1.37) * (1 - adapt);
       if (r.crise) gY = -0.03;
       gY -= g.chocPIB;
       r.yPot *= 1 + gY;
@@ -259,9 +242,9 @@ const Atterrir = (() => {
       let ds = 0.0045 + g.bonusTech + 0.007 * L.bascarbone * fc * eff;
       ds *= 1 - g.penurieMetaux;
       r.s = Math.min(0.97, r.s + ds);
-      r.fc *= 0.997;
-      // Dommages climatiques et hausse des mers
-      const adapt = clamp((riche ? 0.08 : 0.02) + 0.1 * L.solidarite * (riche ? 0.5 : 1.3), 0, 0.6);
+      r.fc *= 0.997 * (1 - 0.004 * L.air);                       // sortie du charbon : moins de carbone par unité fossile
+      r.aer *= 1 - 0.015 - 0.05 * L.air;                         // filtres et désulfuration : moins d'aérosols par EJ
+      // Dommages sur le niveau du PIB : événements extrêmes et montée des mers
       const dClim = P.vuln * 0.012 * Math.max(0, g.T - 0.8) ** 2;
       const dMer = 0.03 * Math.max(0, g.mer - 0.25) * P.cote;
       r.dmg = Math.min(0.5, (dClim + dMer) * (1 - adapt) + r.dmgEvt);
@@ -275,8 +258,20 @@ const Atterrir = (() => {
       r.co2 = foss * r.fc;
       r.cumCO2 += r.co2;
       totE += r.E; totFoss += foss; co2Reg += r.co2; LC += r.E * r.s; gdp += r.pop * r.yEff;
+      aer += foss * r.aer; aerNord += foss * r.aer * POIDS_NORD[r.id];
     }
+    g.totE = totE; g.totFoss = totFoss; g.LC = LC; g.gdp = gdp; g.co2Reg = co2Reg;
+    g.pibIdx = gdp / g.pib0;
+    g.combustion = totFoss / g.foss0;
+    g.aerosolsIdx = aer / g.aer0; g.aerosolsNordIdx = aerNord / g.aerNord0;
+    g.ch4Fossile = 125 * g.combustion * (1 - 0.12 * L.air);      // fuites de méthane (charbon, pétrole, gaz)
+    g.n2oAutre = 1.8 * g.combustion;                              // industrie et combustion
+  }
 
+  // --- Ressources : pétrole, métaux, poissons ----------------------------------------
+  function ressources(st) {
+    const L = st.leviers, g = st.g, t = st.year - ANNEE_DEBUT;
+    const totFoss = g.totFoss, totE = g.totE;
     // Pétrole : le coût énergétique d'extraction monte quand le stock baisse
     const demPetrole = totFoss * 0.38;
     g.eroi = 3 + 15 * Math.pow(Math.max(0, g.petrole) / g.petrole0, 1.2);
@@ -287,6 +282,7 @@ const Atterrir = (() => {
     const charbon = 0.4 * manque;                                   // substitution par le charbon
     g.penuriePetrole = Math.max(0, (manque - charbon + perteNette) / totE);
     g.petrole -= offre; g.prodPetrole = offre;
+    g.co2Fossile = g.co2Reg * 1.033 + charbon * 0.1;               // + ciment, + charbon liquéfié
     if (!st.flags.pic && manque > 0.02 * demPetrole) {
       st.flags.pic = st.year;
       journaliser(st, 'ressource', 'Pic pétrolier',
@@ -295,9 +291,9 @@ const Atterrir = (() => {
     }
 
     // Métaux : croissance économique + construction des infrastructures bas-carbone
-    const ajoutLC = Math.max(0, LC - g.LCprec); g.LCprec = LC;
+    const ajoutLC = Math.max(0, g.LC - g.LCprec); g.LCprec = g.LC;
     const circ = 1 - 0.15 * L.circulaire;
-    const demMet = (0.8 * Math.pow(gdp / g.pib0, 0.8) * Math.exp(-0.005 * t) + 0.2 * ajoutLC / g.ajoutLC0) * circ;
+    const demMet = (0.8 * Math.pow(g.gdp / g.pib0, 0.8) * Math.exp(-0.005 * t) + 0.2 * ajoutLC / g.ajoutLC0) * circ;
     const offreM = Math.min(demMet, g.metaux / 22);
     g.penurieMetaux = demMet > 0 ? 1 - offreM / demMet : 0;
     g.metaux -= offreM; g.demMetaux = demMet;
@@ -308,8 +304,11 @@ const Atterrir = (() => {
         'La transition énergétique est aussi une transition matérielle : les limites se déplacent d’une sphère à l’autre.', 'Mécanisme établi, ampleur débattue', null, { photo: 'ressource-metaux' });
     }
 
-    // Pêches : croissance logistique, effondrement sous 20 % de la capacité
-    g.K = 1000 * (1 - 0.12 * Math.max(0, g.T - 1.2)) * (bascule(st, 'coraux') ? 0.88 : 1) * (1 - 0.08 * Math.max(0, g.acid - 1));
+    // Pêches : croissance logistique, effondrement sous 20 % de la capacité. La capacité baisse avec
+    // le réchauffement, les récifs, l'acidification et les zones mortes dues aux engrais azotés.
+    const acid = (3.57 - g.omega) / 0.71;
+    g.K = 1000 * (1 - 0.12 * Math.max(0, g.T - 1.2)) * (bascule(st, 'coraux') ? 0.88 : 1) * (1 - 0.08 * Math.max(0, acid - 1))
+      * (1 - 0.06 * Math.max(0, g.zonesMortes - 1));
     const rP = 0.36 * (L.peche === 3 ? 1.1 : 1);
     const quota = [Infinity, 0.2, 0.17, 0.14][L.peche];
     const F = Math.min(g.effortBAU, quota);
@@ -324,64 +323,27 @@ const Atterrir = (() => {
       journaliser(st, 'ressource', 'Effondrement des pêcheries',
         'Les grands stocks de poissons s’effondrent les uns après les autres. Les flottes restent à quai.',
         'Comme la morue de Terre-Neuve en 1992 : un stock surexploité peut s’effondrer brutalement et mettre des décennies à revenir.', 'Fait observé', null, { photo: 'ressource-peche' });
-      for (const r of st.regions) r.S -= 3;
     }
+  }
 
-    // Alimentation
-    g.rendement *= 1 + (0.002 + 0.005 * Math.exp(-0.02 * t));
-    const climF = 1 - 0.06 * Math.pow(Math.max(0, g.T - 1.2), 1.4) * (1 - 0.15 * L.agro);
-    const solF = 1 + 0.6 * (60 - g.foret) / 100;
-    const eauF = 1 - 0.12 * Math.max(0, g.eau - 1.6);
-    const pecheF = 1 - 0.05 * (1 - Math.min(1, g.prises / 90));
-    const amocF = bascule(st, 'amoc') ? 0.94 : 1;
-    g.prod = g.rendement * climF * solF * eauF * pecheF * (1 - 0.02 * L.agro) * amocF * (1 - g.chocAlim);
-    let dem = 0;
-    for (const r of st.regions) {
-      r.regime = (0.85 + 0.1 * Math.log(r.yEff / 5000 + 1)) * (1 - 0.04 * L.agro);
-      dem += r.pop * r.regime;
-    }
-    g.phi = g.prod / (dem * g.demNorm);
-    for (const r of st.regions) r.food = g.phi * acces(r, L);
-
-    // Forêts et usage des sols
-    let defor = 0.13 * (1 - 0.3 * L.forets);
-    if (g.phi < 1.05) defor *= 1 + 3 * (1.05 - g.phi);
-    const refor = 0.03 * Math.max(0, L.forets - 1) + 0.02 * L.agro;
-    g.foret += -defor + refor - (bascule(st, 'amazonie') ? 0.1 : 0) - (bascule(st, 'boreale') ? 0.04 : 0);
-    g.luc = 4.0 * defor / 0.13 - 15 * refor + (bascule(st, 'amazonie') ? 1.5 : 0);
-
-    // Émissions totales et climat (réchauffement ∝ émissions cumulées)
-    const retro = (bascule(st, 'pergelisol') ? 1.5 : 0) + (bascule(st, 'boreale') ? 1.0 : 0);
-    g.emissions = co2Reg * 1.033 + charbon * 0.1 + g.luc + retro + g.co2Evt;
-    g.co2Evt = 0;
-    g.cum += g.emissions;
-    const agriF = g.prod / g.prod0 * (1 - 0.06 * L.agro);
-    const fossF = totFoss / g.foss0;
-    g.nonCO2 = 0.22 * agriF + 0.13 * fossF - 0.17 * fossF;   // méthane, protoxyde d'azote, aérosols (refroidissants)
-    g.T += (0.00045 * g.cum + g.nonCO2 - g.T) * 0.35;
-    const tauxMer = 1.8 + 3.2 * Math.max(0, g.T - 0.85) + (bascule(st, 'groenland') ? 1.2 : 0) + (bascule(st, 'antarctique') ? 1.5 : 0);
-    g.mer += tauxMer / 1000; g.tauxMer = tauxMer;
-    derive(st);
-
-    // Autres limites
-    g.azote += 0.2 * (205 * (g.prod / g.prod0) * (1 - 0.18 * L.agro) - g.azote);
-    g.eau = 1.0 + 0.35 * (g.prod / g.prod0) + 0.25 * Math.max(0, g.T - 1.0) - 0.08 * L.agro;
-    g.nouvelles += 0.1 * (1.5 * Math.pow(gdp / g.pib0, 0.5) * (1 - 0.12 * L.circulaire) - g.nouvelles);
-    g.aerosols = 0.7 * fossF;
-    g.ozone = Math.max(0.35, g.ozone - 0.003);
-    g.bii += -0.05 - 0.15 * (defor - refor) - 0.04 * Math.max(0, g.T - 1.2) - 0.03 * Math.max(0, g.nouvelles - 1.5)
-      + 0.03 * L.forets + 0.01 * L.agro;
-    g.bii = clamp(g.bii, 20, 100);
-
-    // Stabilité sociale
+  // --- Stabilité sociale ---------------------------------------------------------------
+  // Pas de retour automatique à la normale : la stabilité tend vers un niveau fixé par les conditions de vie
+  // (manques du donut, inégalités, démocratie, guerres, pénuries, croissance), comparées à celles de 2025.
+  const POIDS_STABILITE = { alim: 0.8, revenu: 0.5, sante: 0.4, eau: 0.2, energie: 0.2, logement: 0.2, educ: 0.1, reseaux: 0.05 };
+  function stabilite(st) {
+    const L = st.leviers, g = st.g;
     const sens = Math.max(0.3, 1 - 0.22 * L.protection);
     for (const r of st.regions) {
-      let dS = 0.06 * (62 - r.S);
-      if (!r.crise) dS += 120 * (r.gEff - 0.015) * sens;
-      if (r.food < 1) dS += 40 * (r.food - 1);
-      dS += r.yEff > SEUIL_RICHE ? -0.25 * L.solidarite : 0.4 * L.solidarite;
-      dS -= 30 * g.penuriePetrole + 5 * g.penurieMetaux;
-      r.S = clamp(r.S + dS, 0, 100);
+      const riche = r.yEff > SEUIL_RICHE;
+      let cible = r.S0;
+      if (r.manque && r.manque0) for (const [d, w] of Object.entries(POIDS_STABILITE)) cible += 100 * w * (r.manque0[d] - r.manque[d]);
+      if (r.gini0 !== undefined) cible += -80 * (r.gini - r.gini0) + 0.1 * (r.demo - r.demo0);
+      cible -= 7 * ((r.guerreInt || 0) - (r.guerreInt0 || 0));
+      cible += 300 * (r.gEff - r.gRef) * sens;
+      cible -= 300 * g.penuriePetrole + 50 * g.penurieMetaux;
+      cible += 2 * L.protection + (riche ? -2 : 3) * L.solidarite;
+      r.Scible = cible;
+      r.S = clamp(r.S + 0.1 * (cible - r.S), 0, 100);
       if (!r.crise && r.S < 20) {
         r.crise = true; r.nbCrises++;
         journaliser(st, 'crise', `${r.court} entre en crise`,
@@ -571,7 +533,7 @@ const Atterrir = (() => {
     for (let i = 0; i < n; i++) {
       const m = choisirParmi(st, MINEURS, x => x.poids(st));
       const r = choisirRegion(st, m.reg);
-      r.S -= 0.25;
+      r.S -= 0.5;
       const morts = m.morts ? tuer(st, r, m.morts(r, st.g.T), 'climat') : 0;
       journaliser(st, 'climat', m.titre(r), variante(st, m.textes), null, null, r.id, { gravite: 1, morts, photo: m.cle, touches: m.touches(r) });
     }
@@ -612,7 +574,7 @@ const Atterrir = (() => {
   function calculerBudget(st) {
     const crises = st.regions.filter(r => r.crise).length;
     const guerres = st.actifs.guerres.filter(w => w.intensite >= 2).length;
-    const b = Math.round(11 + (stabiliteMoyenne(st) - 55) / 7) + bonusCapital(st) - 2 * crises - guerres;
+    const b = Math.round(10 + (stabiliteMoyenne(st) - 55) / 7) + bonusCapital(st) - 2 * crises - guerres;
     return clamp(b, 3, 16);
   }
   // Le capital politique varie d'un point par an au plus. S'il reste sous le coût des politiques pendant
@@ -661,6 +623,8 @@ const Atterrir = (() => {
       mer: g.mer, metaux: g.metaux, poissons: g.poissons, K: g.K, phi: g.phi,
       popR: st.regions.map(r => r.pop), res: (g.petrole / g.petrole0 + g.metaux / g.metaux0) / 2, nouv: g.nouvelles,
     };
+    const m = mesures(st);
+    Object.assign(h, { depasse: m.depassement, manque: m.manque, lim: m.parLimite.map(x => x.z), limDep: m.parLimite.map(x => x.dep), pl: m.parPlancher.map(x => x.part) });
     for (const m of modules) if (m.instantane) Object.assign(h, m.instantane(st));
     return h;
   }
@@ -669,16 +633,24 @@ const Atterrir = (() => {
   // L'état `st` contient toujours l'année en cours de traversée déjà calculée (st.year) ; `st.prec` garde
   // l'état de l'année précédente, pour que l'interface affiche une évolution continue entre les deux.
   function snapshot(st) {
-    return { g: { ...st.g }, regions: st.regions.map(r => ({ ...r })), morts: { ...st.morts },
+    return { g: structuredClone(st.g), regions: structuredClone(st.regions), morts: { ...st.morts },
       migr: st.migr ? { stock: { ...st.migr.stock }, cum: { ...st.migr.cum } } : null };
   }
 
+  function etape(st, nom) {
+    for (const m of modules) if (m.etapes && m.etapes[nom]) m.etapes[nom](st, OUTILS);
+  }
   function calculerAnnee(st) {
     st.prec = snapshot(st);
     st.calcul = true;
     st.year++;
-    stepAnnee(st);
+    economie(st);
+    ressources(st);
+    etape(st, 'alimentation');
+    etape(st, 'terre');
     verifierBascules(st);
+    etape(st, 'social');
+    stabilite(st);
     st.g.chocPIB *= 0.75; st.g.chocAlim *= 0.75;               // les chocs s'estompent d'une année à l'autre
     for (const r of st.regions) r.dmgEvt *= 0.75;
     for (const m of modules) if (m.annee) m.annee(st, OUTILS);
@@ -709,7 +681,10 @@ const Atterrir = (() => {
     const f = clamp(st.t - (st.year - 1), 0, 1);
     const mix = (a, b) => {
       const o = { ...b };
-      for (const k in b) if (typeof b[k] === 'number' && typeof a[k] === 'number') o[k] = a[k] + (b[k] - a[k]) * f;
+      for (const k in b) {
+        if (typeof b[k] === 'number' && typeof a[k] === 'number') o[k] = a[k] + (b[k] - a[k]) * f;
+        else if (b[k] && a[k] && typeof b[k] === 'object' && typeof a[k] === 'object' && !Array.isArray(b[k])) o[k] = mix(a[k], b[k]);
+      }
       return o;
     };
     const v = { ...st, g: mix(st.prec.g, st.g), regions: st.regions.map((r, i) => mix(st.prec.regions[i], r)), morts: mix(st.prec.morts, st.morts) };
@@ -718,21 +693,27 @@ const Atterrir = (() => {
   }
 
   // --- Indicateurs agrégés pour l'interface ----------------------------------
+  // Mesures du donut, à la manière de Fanning et Raworth (Nature, 2025) :
+  // - dépassement écologique : écart moyen des 9 limites à leur seuil (0 = dans la limite ; plafonné à 300 % par limite) ;
+  // - manque social : part moyenne de la population mondiale en manque sur les 12 dimensions.
+  function mesures(st) {
+    const g = st.g, pop = popTotale(st);
+    const parLimite = LIMITES.map(l => ({ id: l.id, z: l.ratio(g), dep: l.depassement(g) }));
+    const parPlancher = PLANCHERS.map(p => ({ id: p.id, part: st.regions.reduce((a, r) => a + r.pop * p.part(r), 0) / pop }));
+    const depassement = parLimite.reduce((a, x) => a + Math.min(3, x.dep), 0) / Math.max(1, parLimite.length);
+    const manque = parPlancher.reduce((a, x) => a + x.part, 0) / Math.max(1, parPlancher.length);
+    return { parLimite, parPlancher, depassement, manque };
+  }
   function manquesSociaux(st) {
-    const pop = popTotale(st);
-    return PLANCHERS.map(p => ({
-      ...p,
-      manque: st.regions.reduce((a, r) => a + r.pop * Math.max(0, 1 - p.val(r)), 0) / pop,
-    }));
+    const m = mesures(st);
+    return PLANCHERS.map((p, i) => ({ ...p, manque: m.parPlancher[i].part }));
   }
-  function partSousPlancher(st) {
-    const pop = popTotale(st);
-    return st.regions.filter(r => PLANCHERS.some(p => p.val(r) < 0.97)).reduce((a, r) => a + r.pop, 0) / pop;
-  }
-  function budgetCarbone(st) {          // budget pour +2 °C, approximatif
-    const total = (2.0 - 0.2) / 0.00045 - 2650;
-    const utilise = st.g.cum - 2650;
-    return { total, utilise, part: utilise / total, anneesRestantes: (total - utilise) / Math.max(0.1, st.g.emissions) };
+  const partSousPlancher = st => mesures(st).manque;
+  // Budget carbone restant depuis début 2025 : 130 Gt CO2 pour 1,5 °C (Forster et al., 2025) ; pour 2 °C,
+  // environ 950 Gt CO2 (GIEC AR6 : 1 150 Gt depuis 2020 à 67 %, moins ~200 Gt émis de 2020 à 2024).
+  function budgetCarbone(st) {
+    const total = 950, utilise = st.g.cum - st.g.cum2025;
+    return { total, utilise, part: utilise / total, anneesRestantes: (total - utilise) / Math.max(0.1, st.g.emissions), budget15: 130 };
   }
   function croissanceMondiale(st) {
     const h = st.hist;
@@ -743,35 +724,45 @@ const Atterrir = (() => {
 
   function bilan(st) {
     const g = st.g;
+    const m = mesures(st), h0 = st.hist[0];
     const franchies = LIMITES.filter(l => l.ratio(g) > 1).length;
     const rouges = LIMITES.filter(l => l.ratio(g) > l.hr).length;
     const crisesTotales = st.regions.reduce((a, r) => a + r.nbCrises, 0);
     const enCrise = st.regions.filter(r => r.crise).length;
-    const sous = partSousPlancher(st);
     const bascules = st.bascules.filter(b => b.active).length;
+    const popMax = Math.max(...st.hist.map(h => h.pop)), popFin = popTotale(st);
+    // Le dépassement écologique ne peut pas revenir à son niveau de 2025 en un siècle (CO2 accumulé, extinctions,
+    // azote) : une « descente maîtrisée » demande qu'il ait passé son pic et décroisse.
+    const pic = Math.max(...st.hist.filter(h => h.a >= ANNEE_FIN - 30).map(h => h.depasse));
+    const enBaisse = m.depassement < pic - 0.02;
     let issue;
-    if (g.T <= 2.0 && enCrise === 0 && crisesTotales <= 1 && sous <= 0.25 && rouges <= 3) issue = 'donut';
-    else if (g.T <= 2.6 && enCrise === 0 && crisesTotales <= 3 && sous <= 0.5) issue = 'descente';
-    else if (enCrise >= 3 || crisesTotales >= 6 || g.T >= 3.6) issue = 'effondrement';
+    if (m.manque <= 0.05 && m.depassement <= 0.10 && g.T <= 2.0 && enCrise === 0) issue = 'donut';
+    else if (m.manque <= 0.8 * h0.manque && enBaisse && enCrise === 0 && g.T <= 2.5) issue = 'descente';
+    else if (enCrise >= 3 || m.manque >= 1.3 * h0.manque || g.T >= 3.5 || popFin < 0.85 * popMax) issue = 'effondrement';
     else issue = 'declin';
     const h90 = st.hist.find(h => h.a === 2090) || st.hist[st.hist.length - 1];
     let ssp = SSP[0], ecart = Infinity;
     for (const s of SSP) { const d = Math.abs(s.pts[3][1] - h90.T); if (d < ecart) { ecart = d; ssp = s; } }
-    const res = { issue, T: g.T, franchies, rouges, crisesTotales, enCrise, sous, bascules, ssp: ssp.id, mer: g.mer };
-    for (const m of modules) if (m.bilan) Object.assign(res, m.bilan(st));
+    const res = {
+      issue, T: g.T, franchies, rouges, crisesTotales, enCrise, bascules, ssp: ssp.id, mer: g.mer, depassementPic: pic,
+      depassement: m.depassement, manque: m.manque, depassement0: h0.depasse, manque0: h0.manque,
+      parLimite: m.parLimite.map((x, i) => ({ ...x, z0: h0.lim[i], dep0: h0.limDep[i] })),
+      parPlancher: m.parPlancher.map((x, i) => ({ ...x, part0: h0.pl[i] })),
+    };
+    for (const mo of modules) if (mo.bilan) Object.assign(res, mo.bilan(st));
     return res;
   }
 
   // Outils mis à disposition des modules (js/societe.js…)
   const OUTILS = {
     ANNEE_DEBUT, ANNEE_FIN, SEUIL_RICHE, PARAM, clamp, alea, triangulaire, choisirRegion, choisirParmi, variante, poisson,
-    tuer, journaliser, trouverEvenement, popTotale, popDe, stabiliteMoyenne, bascule, fr,
+    tuer, journaliser, trouverEvenement, popTotale, popDe, stabiliteMoyenne, bascule, fr, phi, phiInv, LEVIERS,
   };
 
   return {
     ANNEE_DEBUT, ANNEE_FIN, DELAI, CATEGORIES, COUTS, REGIONS, LEVIERS, BASCULES, LIMITES, PLANCHERS, SSP, SEUIL_RICHE,
     nouvellePartie, avancerTemps, vue, regler, verifierReglage, enregistrer: m => modules.push(m),
-    coutTotal, coutLevier, manquesSociaux, partSousPlancher,
+    coutTotal, coutLevier, manquesSociaux, partSousPlancher, mesures, phi, phiInv,
     budgetCarbone, croissanceMondiale, energieParHab, stabiliteMoyenne, fr,
   };
 })();

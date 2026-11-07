@@ -105,8 +105,8 @@ p { margin: 0; }
 .donut .zone:hover { fill: color-mix(in oklab, var(--encre) 6%, transparent); }
 .donut text { fill: var(--encre); font-family: var(--sans); }
 .donut .lbl { font-size: 15px; }
-.donut .lbl-soc { font-size: 12.5px; fill: var(--manque); font-weight: 600; }
-.donut .annee { font-size: 34px; font-weight: 800; font-stretch: 125%; }
+.donut .lbl-soc { font-size: 10.5px; fill: var(--manque); font-weight: 650; paint-order: stroke; stroke: var(--fond); stroke-width: 3px; stroke-linejoin: round; }
+.donut .annee { font-size: 24px; font-weight: 800; font-stretch: 125%; }
 .donut .sous-annee { font-size: 12.5px; fill: var(--encre-2); }
 .detail-donut {
   min-height: 66px; padding: 12px 14px; border-left: 3px solid var(--donut); background: var(--surface);
@@ -364,6 +364,9 @@ dialog { overflow-y: auto; }
 .badge.ocre { background: var(--ocre); }
 .badge.violet { background: var(--manque); }
 .courbes.une { grid-template-columns: minmax(0, 1fr); }
+.tableau.compact { min-width: 0; font-size: 13px; }
+.tableau.compact td, .tableau.compact th { padding: 5px 8px 5px 0; }
+.tableau.compact td { text-align: right; white-space: nowrap; }
 .note-carte { font-size: 12.5px; color: var(--encre-2); margin: 6px 0 14px; max-width: 72ch; }
 .reperes { margin: 0; font-size: 13.5px; }
 .reperes dt { font-weight: 650; margin-top: 10px; }

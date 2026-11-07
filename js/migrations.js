@@ -78,7 +78,7 @@
     // Effets sur les régions d'accueil : tensions, rejet, ouverture des frontières
     for (const r of R) {
       const part = r.arr / r.pop, al = m.alertes[r.id];
-      r.S -= 80 * part;
+      r.S -= 150 * part;
       if (r.tension !== undefined) r.tension = o.clamp(r.tension + 150 * part, 0, 100);
       r.rejet = o.clamp(r.rejet * 0.85 + 25 * part, 0, 1);
       r.ouv = o.clamp(0.85 - 0.8 * r.rejet - 0.004 * Math.max(0, (r.tension === undefined ? 30 : r.tension) - 30) + 0.08 * L.solidarite, 0.05, 1);

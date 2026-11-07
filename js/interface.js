@@ -6,28 +6,11 @@
   const A = Atterrir, P = Panneaux, fr = A.fr, NB = '\u00a0';
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-  const CLE = 'atterrir.partie.v2', CLE_OPT = 'atterrir.options';
+  const CLE = 'atterrir.partie.v3', CLE_OPT = 'atterrir.options';
   const NIVEAUX = ['aucun', 'modéré', 'fort', 'maximal'];
   const SPH = {
     atmo: ['Atmosphère', 'var(--atmo)'], hydro: ['Hydrosphère', 'var(--hydro)'], cryo: ['Cryosphère', 'var(--cryo)'],
     litho: ['Lithosphère', 'var(--litho)'], bio: ['Biosphère', 'var(--bio)'], anthropo: ['Anthroposphère', 'var(--anthropo)'],
-  };
-  const DESC_LIMITES = {
-    climat: 'Concentration de CO₂ dans l’atmosphère.',
-    biosphere: 'Part des espèces et des écosystèmes encore intacts.',
-    sols: 'Forêts restantes par rapport à leur surface d’origine.',
-    eau: 'Perturbation du cycle de l’eau douce : rivières, nappes, humidité des sols.',
-    azote: 'Engrais azotés et phosphatés qui ruissellent vers les rivières et les mers.',
-    acid: 'Le CO₂ dissous rend l’océan plus acide : coquillages et coraux en souffrent.',
-    nouvelles: 'Plastiques, pesticides et substances chimiques nouvelles dans l’environnement.',
-    aerosols: 'Particules en suspension (fumées, sulfates) qui perturbent les moussons. Elles refroidissent aussi un peu le climat.',
-    ozone: 'Grâce au protocole de Montréal (1987), la couche d’ozone se reconstitue : la preuve qu’une limite peut être réparée.',
-  };
-  const DESC_PLANCHERS = {
-    revenu: 'Revenu moyen sous 12 000 $ par habitant.',
-    alim: 'Production alimentaire accessible inférieure aux besoins.',
-    energie: 'Moins de 30 GJ d’énergie par habitant et par an (à efficacité égale à celle de 2025 : une maison mieux isolée chauffe autant avec moins).',
-    stab: 'Stabilité sociale sous 45 sur 100.',
   };
   let etat = null, st = null, onglet = 'politiques', regionSel = 'asi', metrique = 'co2hab';
   let zoneFixe = null, zoneVol = null, nonLus = 0;
@@ -54,7 +37,7 @@
       const s = localStorage.getItem(CLE);
       if (!s) return null;
       const o = JSON.parse(s);
-      return o && o.version === 2 && o.regions && o.actifs ? o : null;
+      return o && o.version === 3 && o.regions && o.actifs ? o : null;
     } catch (e) { return null; }
   }
   function chargerOptions() {
@@ -218,13 +201,15 @@
       lbl += `<text class="lbl" x="${x}" y="${(y + (c > 0.6 ? -2 : c < -0.6 ? 12 : 4)).toFixed(1)}" text-anchor="${anchor}">${l.court}</text>`;
       zones += `<path class="zone" tabindex="0" role="button" aria-label="${esc(l.nom)}" data-z="e${i}" d="${secteur(R_IN, 214, a1 - 1.6, a2 + 1.6)}"/>`;
     });
+    const pasS = 360 / Math.max(1, manques.length);
     manques.forEach((m, i) => {
-      const a1 = i * 90 + 3, a2 = (i + 1) * 90 - 3, am = (i + 0.5) * 90;
-      const len = Math.min(76, m.manque * 160);
-      if (len > 0.5) int += `<path class="int" d="${secteur(R_IN - len, R_IN, a1, a2)}" fill="var(--manque)" opacity="0.85"/>`;
-      const [x, y] = pt(66, am);
-      lbl += `<text class="lbl-soc" x="${x}" y="${y + 4}" text-anchor="middle">${m.court}</text>`;
-      zones += `<path class="zone" tabindex="0" role="button" aria-label="Plancher social : ${esc(m.nom)}" data-z="s${i}" d="${secteur(20, R_IN, a1 - 3, a2 + 3)}"/>`;
+      const a1 = i * pasS + 1.2, a2 = (i + 1) * pasS - 1.2, am = (i + 0.5) * pasS;
+      const len = Math.min(68, m.manque * 110);
+      if (len > 0.5) int += `<path class="int" d="${secteur(R_IN - len, R_IN, a1, a2)}" fill="var(--manque)" opacity="0.8"/>`;
+      // étiquettes radiales, toujours lisibles de gauche à droite
+      const [x, y] = pt(64, am), rot = am < 180 ? am - 90 : am + 90;
+      lbl += `<text class="lbl-soc halo" x="${x}" y="${y}" transform="rotate(${rot.toFixed(1)} ${x} ${y})" text-anchor="middle" dominant-baseline="middle">${m.court}</text>`;
+      zones += `<path class="zone" tabindex="0" role="button" aria-label="Plancher social : ${esc(m.nom)}" data-z="s${i}" d="${secteur(22, R_IN, a1 - 1.2, a2 + 1.2)}"/>`;
     });
     const n = franchies();
     $('#donut').innerHTML = `
@@ -235,8 +220,7 @@
         <circle r="${R_IN}" fill="none" stroke="var(--donut)" stroke-width="1.5"/>
         <circle r="${R_OUT}" fill="none" stroke="var(--donut)" stroke-width="1.5"/>
         ${int}${lbl}
-        <text class="annee" y="2" text-anchor="middle">${Math.floor(st.t)}</text>
-        <text class="sous-annee" y="20" text-anchor="middle">${n} limites franchies</text>
+        <text class="annee" y="6" text-anchor="middle">${Math.floor(st.t)}</text>
         ${zones}
       </svg>`;
     majDetail(zoneVol || zoneFixe);
@@ -246,9 +230,9 @@
     const el = $('#detail-donut');
     el.className = 'detail-donut';
     if (!z) {
-      const sous = A.partSousPlancher(st);
+      const m = A.mesures(st);
       el.innerHTML = `<strong>${franchies()} limites planétaires franchies sur 9</strong>
-        ${sous > 0.005 ? `${pct(sous)} de la population vit dans une région sous le plancher social.` : 'Toutes les régions sont au-dessus du plancher social.'}
+        Manque social moyen : ${pct(m.manque, 1)} de la population sur les 12 dimensions. Dépassement écologique moyen : ${pct(m.depassement)}.
         Touchez une part du donut pour le détail.`;
       return;
     }
@@ -256,13 +240,13 @@
       const l = A.LIMITES[+z.slice(1)], r = l.ratio(st.g);
       const etat = r <= 1 ? 'Dans l’espace sûr.' : r <= l.hr ? 'Limite franchie : zone d’incertitude, le risque augmente.' : 'Zone à haut risque.';
       el.classList.add(r <= 1 ? 'sur' : r <= l.hr ? 'ocre' : 'alerte');
-      el.innerHTML = `<strong>${l.nom}</strong>${l.val(st.g)} (${l.seuil}). ${etat}<br>${DESC_LIMITES[l.id]}`;
+      el.innerHTML = `<strong>${l.nom}</strong>${l.val(st.g)} (${l.seuil}). ${etat}<br>${l.desc}`;
     } else {
       const p = A.PLANCHERS[+z.slice(1)];
-      const sous = st.regions.filter(r => p.val(r) < 0.97).map(r => r.court);
+      const monde = st.regions.reduce((a, r) => a + r.pop * p.part(r), 0) / popTot();
+      const parRegion = [...st.regions].sort((a, b) => p.part(b) - p.part(a)).map(r => `${r.court} ${pct(p.part(r))}`).join(', ');
       el.classList.add('manque');
-      el.innerHTML = `<strong>Plancher social : ${p.nom}</strong>${DESC_PLANCHERS[p.id]}
-        ${sous.length ? `Sous le plancher : ${sous.join(', ')}.` : 'Aucune région sous le plancher.'}`;
+      el.innerHTML = `<strong>Plancher social : ${p.nom} — ${pct(monde)} en manque</strong>${p.desc} Seuil : ${p.seuil}.<br>Par région : ${parRegion}.`;
     }
   }
 
@@ -280,7 +264,8 @@
       </svg>
       <div>
         <p>Budget carbone pour rester sous +2${NB}°C : <strong>${pct(part)}</strong> consommé depuis 2025.
-        ${b.part >= 1 ? 'Il est épuisé.' : `Au rythme actuel, il sera épuisé dans ${Math.round(b.anneesRestantes)}${NB}ans.`}</p>
+        ${b.part >= 1 ? 'Il est épuisé.' : `Au rythme actuel, il sera épuisé dans ${Math.round(b.anneesRestantes)}${NB}ans.`}
+        Celui de 1,5${NB}°C (130${NB}Gt début 2025) ${b.utilise >= b.budget15 ? 'est épuisé' : `est entamé à ${pct(b.utilise / b.budget15)}`}.</p>
         <p>${croiss > 0.0005
           ? `Économie mondiale : ${signe(croiss * 100)}${NB}% par an. À ce rythme, elle double tous les ${dbl}${NB}ans.`
           : `Économie mondiale : ${signe(croiss * 100)}${NB}% par an.`}</p>
@@ -299,10 +284,13 @@
       case 'sobriete': return riches.length ? `Concerne aujourd’hui : ${riches.join(', ')}.` : 'Aucune région au-dessus de 30 000 $/hab.';
       case 'protection': return `Stabilité sociale moyenne : ${Math.round(A.stabiliteMoyenne(st))}/100.`;
       case 'forets': return `Couvert forestier : ${fr(g.foret, 1)}${NB}% de la surface d’origine.`;
-      case 'agro': return `Engrais azotés : ${Math.round(g.azote)}${NB}Mt par an.`;
+      case 'agro': return `Azote fixé : ${Math.round(g.azote)}${NB}Tg par an ; terres cultivées : ${fr(g.cultures / 1000, 2)}${NB}milliard d’ha.`;
       case 'peche': return `Prises : ${Math.round(g.prises)}${NB}Mt par an.`;
       case 'circulaire': return `Stock de métaux extractibles : ${pct(g.metaux / g.metaux0)} de celui de 2025.`;
       case 'solidarite': return `Stabilité de l’Afrique : ${Math.round(afr.S)}/100.`;
+      case 'sante': return `Espérance de vie mondiale : ${fr(moy(r => r.LE), 1)}${NB}ans ; en Afrique : ${fr(afr.LE, 1)}${NB}ans.`;
+      case 'eau': return `Nappes non renouvelables : ${pct(g.nappes)} de leur niveau de 2025 ; ${pct(moy(r => r.manque.eau))} de la population sans eau ou assainissement sûrs.`;
+      case 'air': return `Pollution de l’air : ${fr(g.mortsPollution, 1)}${NB}million de décès par an ; refroidissement par les aérosols : ${fr(-g.forcages.aerosols, 2)}${NB}W/m².`;
       default: return '';
     }
   }
@@ -361,6 +349,8 @@
       gini: { nom: 'Inégalités', val: r => r.gini, fmt: v => `Gini ${fr(v, 2)}`, min: 0.25, max: 0.55, bas: '0,25', haut: '0,55' },
       demo: { nom: 'Démocratie', val: r => r.demo, fmt: v => `${Math.round(v)}/100`, max: 100, bien: true, bas: '0', haut: '100' },
       tension: { nom: 'Tensions', val: r => r.tension, fmt: v => `${Math.round(v)}/100`, max: 100, bas: '0', haut: '100' },
+      faim: { nom: 'Sous-nutrition', val: r => r.manque.alim, fmt: v => pct(v, 1), max: 0.25, bas: '0 %', haut: '25 %' },
+      ev: { nom: 'Espérance de vie', val: r => r.LE, fmt: v => `${fr(v, 1)}${NB}ans`, min: 60, max: 85, bien: true, bas: '60 ans', haut: '85 ans' },
     };
   }
   function couleur(m, v) {
@@ -415,7 +405,9 @@
         <div><dt>Énergie bas-carbone</dt><dd>${pct(r.s)}</dd></div>
         <div><dt>Émissions de CO₂</dt><dd>${fr(r.co2, 1)}${NB}Gt/an</dd></div>
         <div><dt>Stabilité sociale</dt><dd>${Math.round(r.S)}/100<div class="barre-mini" style="--c:${sc}"><i style="width:${r.S}%"></i></div></dd></div>
-        <div><dt>Alimentation</dt><dd>${fr(r.food, 2)} <small>1 = besoins couverts</small></dd></div>
+        <div><dt>Sous-nutrition</dt><dd>${pct(r.manque.alim, 1)}</dd></div>
+        <div><dt>Espérance de vie</dt><dd>${fr(r.LE, 1)}${NB}ans</dd></div>
+        <div><dt>Sous 6,85${NB}$ par jour</dt><dd>${pct(r.pauvrete)}</dd></div>
         <div><dt>Départs forcés</dt><dd>${compact(r.dep)}<small>/an</small> <small>dont climat ${compact(r.depClim)}</small></dd></div>
         <div><dt>Solde migratoire</dt><dd>${r.solde >= 0 ? '+' : '−'}${compact(Math.abs(r.solde))}<small>/an</small></dd></div>
         <div><dt>Inégalités (Gini)</dt><dd>${fr(r.gini, 2)}</dd></div>
@@ -499,11 +491,14 @@
         <section class="bloc" style="--c:var(--bio)">
           <h3>Terres et alimentation</h3>
           <dl class="chiffres">
-            <div><dt>Couvert forestier</dt><dd>${fr(g.foret, 1)}${NB}%</dd></div>
-            <div><dt>Production alimentaire</dt><dd>${pct(g.phi)} <small>des besoins</small></dd></div>
-            <div><dt>Engrais azotés</dt><dd>${Math.round(g.azote)}${NB}Mt/an</dd></div>
+            <div><dt>Terres cultivées</dt><dd>${fr(g.cultures, 0)}${NB}Mha</dd></div>
+            <div><dt>Pâturages</dt><dd>${fr(g.paturages, 0)}${NB}Mha</dd></div>
+            <div><dt>Couvert forestier</dt><dd>${fr(g.foret, 1)}${NB}% <small>du potentiel</small></dd></div>
+            <div><dt>Production / demande</dt><dd>${pct(g.phi)} <small>de 2025</small></dd></div>
+            <div><dt>Engrais azotés de synthèse</dt><dd>${Math.round(g.azoteSynth)}${NB}Tg/an</dd></div>
+            <div><dt>Nappes non renouvelables</dt><dd>${pct(g.nappes)} <small>de 2025</small></dd></div>
           </dl>
-          <p class="note">Plus de terres cultivées, c’est moins de forêts. L’agroécologie et des régimes moins carnés desserrent l’étau.</p>
+          <p class="note">Rendements : azote ${pct(g.facteurs ? g.facteurs.azote : 1)}, eau ${pct(g.facteurs ? g.facteurs.eau : 1)}, pollinisateurs ${pct(g.facteurs ? g.facteurs.pollinisateurs : 1)}, climat ${pct(g.facteurs ? g.facteurs.climat : 1)}, sols ${pct(g.sol)} (100 % = niveau de 2025). Les engrais dépendent du gaz fossile : une pénurie d’énergie fait chuter les récoltes.</p>
         </section>
       </div>`;
   }
@@ -516,11 +511,12 @@
     const maxE = Math.max(50, ...st.hist.map(h => h.em + 2));
     const minE = Math.min(0, ...st.hist.map(h => h.em));
     const blocs = [
-      ['atmo', [['Réchauffement', deg(g.T)], ['CO₂', `${Math.round(g.ppm)}${NB}ppm`], ['Émissions', `${fr(g.emissions, 1)}${NB}Gt/an`], ['Autres gaz et aérosols', `${signe(g.nonCO2, 2)}${NB}°C`]]],
-      ['hydro', [['Acidité (Ω aragonite)', fr(g.omega, 2)], ['Eau douce', `indice ${fr(g.eau, 2)}`], ['Courant atlantique', etatB('amoc')], ['Récifs coralliens', etatB('coraux')]]],
+      ['atmo', [['Réchauffement', deg(g.T)], ['CO₂', `${Math.round(g.ppm)}${NB}ppm`], ['Méthane', `${Math.round(g.ch4)}${NB}ppb`], ['Protoxyde d’azote', `${Math.round(g.n2o)}${NB}ppb`],
+        ['Forçage radiatif', `+${fr(g.forcage, 2)}${NB}W/m²`], ['Dont aérosols', `${fr(g.forcages.aerosols, 2)}${NB}W/m²`], ['Émissions de CO₂', `${fr(g.emissions, 1)}${NB}Gt/an`], ['Déséquilibre énergétique', `${fr(g.desequilibre, 2)}${NB}W/m²`]]],
+      ['hydro', [['Acidité (Ω aragonite)', fr(g.omega, 2)], ['Eau bleue perturbée', `${fr(g.eauBleue, 1)}${NB}% des terres`], ['Eau verte perturbée', `${fr(g.eauVerte, 1)}${NB}% des terres`], ['Nappes non renouvelables', pct(g.nappes)], ['Courant atlantique', etatB('amoc')], ['Récifs coralliens', etatB('coraux')]]],
       ['cryo', [['Banquise arctique en été', pct(g.banquise)], ['Niveau de la mer', `+${fr(g.mer * 100, 0)}${NB}cm <small>depuis 1900</small>`], ['Montée actuelle', `${fr(g.tauxMer, 1)}${NB}mm/an`], ['Groenland', etatB('groenland')]]],
-      ['litho', [['Pétrole restant', `${fr(g.petrole / 6, 0)}${NB}Gb`], ['Métaux', pct(g.metaux / g.metaux0)], ['Pergélisol', etatB('pergelisol')]]],
-      ['bio', [['Intégrité de la biosphère', `${fr(g.bii, 1)}${NB}%`], ['Forêts', `${fr(g.foret, 1)}${NB}%`], ['Amazonie', etatB('amazonie')], ['Poissons', `${fr(g.poissons, 0)}${NB}Mt`]]],
+      ['litho', [['Pétrole restant', `${fr(g.petrole / 6, 0)}${NB}Gb`], ['Métaux', pct(g.metaux / g.metaux0)], ['Azote fixé', `${Math.round(g.azote)}${NB}Tg/an`], ['Phosphore', `${fr(g.phosphore, 1)}${NB}Tg/an`], ['Entités nouvelles', `indice ${fr(g.nouvelles, 2)}`], ['Pergélisol', etatB('pergelisol')]]],
+      ['bio', [['Extinctions', `${Math.round(g.emsy)}${NB}E/MSY`], ['Production primaire appropriée', `${fr(g.hanpp, 1)}${NB}%`], ['Intégrité des écosystèmes', `${fr(g.bii, 1)}${NB}%`], ['Forêts', `${fr(g.foret, 1)}${NB}% <small>du potentiel</small>`], ['Amazonie', etatB('amazonie')], ['Poissons', `${fr(g.poissons, 0)}${NB}Mt`]]],
       ['anthropo', [['Population', popTexte(popTot())], ['PIB mondial', `${fr(pib, 0)}${NB}000${NB}Md$`], ['Stabilité moyenne', `${Math.round(A.stabiliteMoyenne(st))}/100`], ['Régions en crise', `${crises}`]]],
     ];
     const html = blocs.map(([id, rows]) => `<section class="bloc" style="--c:${SPH[id][1]}"><h3>${SPH[id][0]}</h3>
@@ -591,7 +587,7 @@
 
   const ISSUES = {
     donut: ['Atterrissage réussi', 'Le monde est entré dans le donut : réchauffement contenu sous 2 °C, aucune société en crise, besoins essentiels couverts pour la grande majorité. Certaines limites restent franchies, l’effort doit continuer.'],
-    descente: ['Descente maîtrisée', 'Le pire a été évité : les sociétés ont tenu et le réchauffement a été freiné. Mais le monde reste hors du donut, avec des dommages qui dureront des siècles.'],
+    descente: ['Descente maîtrisée', 'Le manque social a nettement reculé et le dépassement écologique a passé son pic : le monde reste hors du donut, mais il en prend le chemin. Le CO₂ accumulé, les extinctions et l’azote dans les sols pèseront encore des siècles.'],
     declin: ['Déclin chaotique', 'Crises à répétition, ressources épuisées, climat déréglé : le monde de 2100 est plus pauvre et plus fragile, sans s’être effondré partout.'],
     effondrement: ['Effondrement', 'Plusieurs grandes régions ont basculé dans la crise. Les émissions ont fini par baisser, mais parce que les économies se sont effondrées. C’est le scénario que redoutent les collapsologues.'],
   };
@@ -606,7 +602,8 @@
         <div><dt>Limites franchies</dt><dd>${b.franchies} sur 9</dd></div>
         <div><dt>Points de bascule</dt><dd>${b.bascules} sur 7</dd></div>
         <div><dt>Crises régionales</dt><dd>${b.crisesTotales}</dd></div>
-        <div><dt>Sous le plancher social</dt><dd>${pct(b.sous)}</dd></div>
+        <div><dt>Manque social</dt><dd>${pct(b.manque, 1)} <small>2025 : ${pct(b.manque0, 1)}</small></dd></div>
+        <div><dt>Dépassement écologique</dt><dd>${pct(b.depassement)} <small>2025 : ${pct(b.depassement0)}, pic : ${pct(b.depassementPic)}</small></dd></div>
         <div><dt>Hausse des mers</dt><dd>+${fr(b.mer * 100, 0)}${NB}cm</dd></div>
         <div><dt>Morts (guerres, famines, épidémies, catastrophes)</dt><dd>${P.morts(b.mortsTotal, fr)}</dd></div>
         <div><dt>Déplacés climatiques depuis 2025</dt><dd>${P.morts(b.cumClim, fr)}</dd></div>
@@ -616,9 +613,17 @@
         <div><dt>Démocratie en 2100</dt><dd>${Math.round(b.demo)}/100</dd></div>
         <div><dt>Inégalités en 2100</dt><dd>Gini ${fr(b.gini, 2)}</dd></div>
       </dl>
+      <h3 class="titre-section">Le donut en 2100, comparé à 2025</h3>
+      <div class="defile"><table class="tableau compact">
+        <thead><tr><th scope="col">Plancher social</th><th scope="col">2025</th><th scope="col">2100</th></tr></thead>
+        <tbody>${b.parPlancher.map((x, i) => `<tr><th scope="row">${A.PLANCHERS[i].nom}</th><td>${pct(x.part0)}</td><td class="${x.part < x.part0 - 0.005 ? 'bien' : x.part > x.part0 + 0.005 ? 'mal' : ''}">${pct(x.part)}</td></tr>`).join('')}</tbody>
+        <thead><tr><th scope="col">Limite planétaire (écart à la limite)</th><th scope="col">2025</th><th scope="col">2100</th></tr></thead>
+        <tbody>${b.parLimite.map((x, i) => `<tr><th scope="row">${A.LIMITES[i].nom}</th><td>${x.dep0 > 0 ? `+${pct(x.dep0)}` : 'sûre'}</td><td class="${x.dep < x.dep0 - 0.01 ? 'bien' : x.dep > x.dep0 + 0.01 ? 'mal' : ''}">${x.dep > 0 ? `+${pct(x.dep)}` : 'sûre'}</td></tr>`).join('')}</tbody>
+      </table></div>
       <figure>${courbeTemperature(560, 220)}<figcaption>Votre réchauffement (trait plein) et les scénarios du GIEC (valeurs centrales approximatives, moyenne 2081-2100 placée en 2090).</figcaption></figure>
       <p class="graine">Partie n°${st.seed}. Pour rejouer exactement la même partie, ajoutez #s${st.seed} à la fin de l’adresse de la page.</p>`;
     $('#d-fin').showModal();
+    $('#d-fin').scrollTop = 0;
   }
 
   // ---------- Actions ----------

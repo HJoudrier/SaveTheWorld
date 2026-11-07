@@ -157,6 +157,15 @@ const Panneaux = (() => {
       <div class="defile"><table class="tableau">
         <thead><tr><th scope="col">Région</th><th scope="col">Population</th><th scope="col">Gini</th><th scope="col">Démocratie</th><th scope="col">Tension</th><th scope="col">Stabilité</th><th scope="col">Situation</th></tr></thead>
         <tbody>${lignes}</tbody></table></div>
+      <h3 class="titre-section">Plancher social du donut</h3>
+      <p class="intro-panneau">Part de la population en manque, pour chacune des 12 dimensions de Kate Raworth. Les valeurs de 2025 viennent des statistiques de l’ONU, de la FAO, de la Banque mondiale et de l’OMS (agrégats régionaux approximatifs).</p>
+      <div class="defile"><table class="tableau compact">
+        <thead><tr><th scope="col">Dimension</th>${R.map(r => `<th scope="col">${r.court}</th>`).join('')}<th scope="col">Monde</th></tr></thead>
+        <tbody>${A.PLANCHERS.map(p => {
+          const monde = R.reduce((a, r) => a + r.pop * p.part(r), 0) / R.reduce((a, r) => a + r.pop, 0);
+          const cel = v => `<td style="background:color-mix(in oklab, var(--manque) ${Math.round(Math.min(1, v) * 55)}%, transparent)">${Math.round(100 * v)}${NB}%</td>`;
+          return `<tr><th scope="row" title="${esc(p.desc)}">${p.nom}</th>${R.map(r => cel(p.part(r))).join('')}${cel(monde)}</tr>`;
+        }).join('')}</tbody></table></div>
       <h3 class="titre-section">Évolution</h3>
       <p class="legende">${legende}</p>
       <div class="courbes">

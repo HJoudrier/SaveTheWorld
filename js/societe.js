@@ -98,6 +98,7 @@
     for (const r of st.regions) {
       const P = INIT[r.id];
       r.gini = P.gini; r.demo = P.demo; r.tension = P.tens; r.derniereRev = -99;
+      r.gini0 = P.gini; r.demo0 = P.demo;   // références de 2025 pour la stabilité (js/moteur.js)
     }
     for (const r of st.regions) {                // décalages pour que les niveaux de départ soient à l'équilibre
       r.demoOff = r.demo - cibleDemo(r, st);
@@ -111,6 +112,7 @@
         { gravite: 2, photo: 'guerre', enCours: true, touches: reg(st, w.region).pop * PART_ZONE[w.intensite], labelTouches: LBL_GUERRE });
       st.actifs.guerres[i].evtId = e.id;
     });
+    for (const r of st.regions) { r.guerreInt0 = guerreDe(st, r.id)?.intensite || 0; r.guerreInt = r.guerreInt0; }
   }
 
   // --- Guerres -------------------------------------------------------------------
@@ -141,8 +143,9 @@
       const m = o.tuer(st, r, r.pop * MORT_GUERRE[w.intensite] * (0.6 + 0.8 * o.alea(st)), 'guerre');
       w.morts += m;
       majEvt(st, o, w.evtId, { morts: w.morts, touches: r.pop * PART_ZONE[w.intensite] });
-      const sup = Math.max(0, w.intensite - w.base);       // les guerres déjà en cours en 2025 sont comprises dans la stabilité de départ
-      r.S -= 0.7 * sup; r.dmgEvt += 0.004 * sup;
+      // L'effet sur la stabilité passe par sa cible (js/moteur.js, guerreInt) ; ici, les destructions économiques.
+      // Les guerres en cours en 2025 sont déjà dans le PIB de départ : seule l'intensité supplémentaire coûte.
+      r.dmgEvt += 0.004 * Math.max(0, w.intensite - w.base);
       if (w.intensite < 3 && r.tension > 65 && o.alea(st) < 0.06) {
         w.intensite++;
         o.journaliser(st, 'guerre', `La guerre s’aggrave : ${r.court}`,
@@ -174,7 +177,7 @@
       const f = liste.find(x => x.region === r.id);
       const deficit = Math.max(0, 0.92 - r.food);
       if (f) {
-        // le moteur retire déjà ces décès de la population : ici, on les compte seulement
+        // ces décès sont déjà retirés de la population par la baisse de l'espérance de vie (js/donut.js) : ici, on les compte seulement
         const m = r.pop * 0.5 * 0.03 * deficit;
         st.morts.famine += m; f.morts += m;
         const touches = r.pop * o.clamp((0.95 - r.food) * 1.2, 0.02, 0.4);
@@ -233,7 +236,7 @@
       const cibles = e.portee === 'monde' ? st.regions : [reg(st, e.portee)];
       for (const r of cibles) {
         const m = o.tuer(st, r, r.pop * e.mort / e.duree * vf(r), 'epidemie');
-        e.morts += m; r.S -= 0.6 * e.gravite;
+        e.morts += m; r.S -= 1.0 * e.gravite;
       }
       if (e.portee === 'monde') g.chocPIB += 0.004 * e.gravite;
       majEvt(st, o, e.evtId, { morts: e.morts, touches: e.morts / e.ifr });
@@ -371,14 +374,13 @@
   // --- Une année ------------------------------------------------------------------------
   function annee(st, o) {
     for (const r of st.regions) {
-      const P = INIT[r.id];
       r.gini = o.clamp(r.gini + 0.05 * (cibleGini(r, st) - r.gini), 0.22, 0.70);
       r.demo = o.clamp(r.demo + 0.05 * (cibleDemo(r, st) + r.demoOff - r.demo) - 0.08, 3, 97);
       r.tension = o.clamp(r.tension + 0.15 * (cibleTension(r, st) + r.tensOff - r.tension), 0, 100);
-      // inégalités et démocratie pèsent sur la stabilité sociale, par rapport à la situation de départ
-      r.S += -8 * (r.gini - (P.gini + 0.03)) + 0.03 * (r.demo - P.demo);
+      // l'effet des inégalités et de la démocratie sur la stabilité passe par sa cible (js/moteur.js)
     }
     guerres(st, o);
+    for (const r of st.regions) r.guerreInt = guerreDe(st, r.id)?.intensite || 0;
     famines(st, o);
     epidemies(st, o);
     revoltes(st, o);
